@@ -1,0 +1,97 @@
+# ed-triage-benchmark - main configuration (single source of truth).
+#
+# Every section listed in triagebench.utils.config.SCIENCE_SECTIONS is hashed into the
+# campaign id: changing any of them creates a NEW campaign (old results are never
+# overwritten). Runtime-only settings (paths, resources) are NOT hashed, so changing the
+# number of workers or the machine never forks a campaign.
+#
+# Profiles (configs/profiles/*.yaml) are merged on top of this file: --profile qflex
+
+include:
+  - cleaning.yaml
+  - models.yaml
+
+campaign:
+  tag: main
+
+paths:
+  outputs: outputs        # gitignored; per-patient artifacts live in outputs/**/private/
+  reports: reports        # committed; aggregated + masked (n < 11) only
+
+dataset:
+  name: MIMIC-IV-ED
+  version: "2.2"
+  doi: 10.13026/5ntk-km72
+  url: https://physionet.org/content/mimic-iv-ed/2.2/
+  downloaded_on: "2026-11-04"
+  # Runtime paths (not hashed). Data never lives inside the repository.
+  zip_path: ${TRIAGEBENCH_ZIP:-C:/datasets/mimic-iv-ed/zip/mimic-iv-ed-2.2.zip}
+  extract_dir: ${TRIAGEBENCH_DATA_DIR:-C:/datasets/mimic-iv-ed/extracted}
+  tables:
+    triage: ed/triage.csv.gz
+    edstays: ed/edstays.csv.gz
+
+features:
+  target: acuity            # never a feature
+  group: subject_id         # split unit; never a feature
+  id: stay_id               # never a feature
+  vitals: [temperature, heartrate, resprate, o2sat, sbp, dbp]
+  labels: [1, 2, 3, 4, 5]   # 1 = most urgent
+
+prepare:
+  sample_fraction: null     # patient-level subsample for quick local runs (null = full cohort)
+
+variants:
+  A_keep_encode:
+    role: primary
+    description: >-
+      Keep every stay with a valid acuity. pain is parsed into a numeric value plus a
+      status category (numeric / missing / unable / other), so non-numeric strings are
+      kept as information instead of being dropped.
+    exclude_non_numeric_pain: false
+    numeric_features: [temperature, heartrate, resprate, o2sat, sbp, dbp, pain_value]
+    categorical_features: [pain_status]
+  B_pain_numeric_only:
+    role: sensitivity
+    description: >-
+      Original proposal: drop every stay whose pain is not a plain number in [0, 10].
+      Uses the same patient partitions as A (nested subset).
+    exclude_non_numeric_pain: true
+    numeric_features: [temperature, heartrate, resprate, o2sat, sbp, dbp, pain_value]
+    categorical_features: []
+
+split:
+  seeds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  priority_seeds: 5          # seeds 1-5 of every variant are scheduled before seeds 6-10
+  fractions: {train: 0.70, val: 0.15, test: 0.15}
+  stratify_by: patient_min_acuity   # each patient's most urgent visit
+
+imbalance:
+  strategies: [none, class_weight, oversample]
+
+hpo:
+  n_configs: 20              # identical budget (number of configurations) for every model
+  include_defaults: true     # configuration 0 = library defaults
+  selection_metric: macro_f1 # chosen on VALIDATION only
+
+evaluation:
+  disclosure_min_cell: 11    # counts 1..10 are masked in anything that leaves outputs/
+  save_predictions: true     # per-stay predictions -> outputs/**/private/ (never in git)
+  save_models: [logreg, gnb, dtree, ordinal_logit, dummy_prior, dummy_stratified]
+  cost_benchmark:
+    enabled: true            # sequential, 1-thread refit of frozen configs for clean timings
+    variant: A_keep_encode
+    seed: 1
+    repeats: 3
+
+resources:                   # runtime only (not hashed)
+  max_workers: 2
+  threads_per_worker: 1
+  reserve_cpus: 2            # do not launch if 1-min load > n_cpus - reserve
+  min_free_ram_gb: 2
+  max_cpu_temp_c: null       # e.g. 80 on the x299
+  nice: 10
+  task_timeout_hours: 24
+  max_attempts: 3
+  poll_seconds: 10
+  launch_interval_seconds: 5

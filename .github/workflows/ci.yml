@@ -1,0 +1,26 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - name: Install (locked)
+        run: uv sync --frozen
+      - name: Lint
+        run: uv run ruff check src tests
+      - name: Data-governance check (.gitignore baits)
+        run: bash scripts/check_gitignore.sh
+      - name: Tests (synthetic data only)
+        run: uv run pytest
+      - name: End-to-end smoke (synthetic data only)
+        if: hashFiles('src/triagebench/runner/pipeline.py') != ''
+        run: uv run python -m triagebench smoke

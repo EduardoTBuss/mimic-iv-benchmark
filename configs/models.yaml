@@ -1,0 +1,86 @@
+# Models, fixed parameters and hyper-parameter search spaces.
+#
+# primary   = the 8 models of the research question (H1 compares the two groups below)
+# extra     = complementary models (reported descriptively, outside H1)
+# reference = trivial baselines that any useful model must beat
+
+models:
+  primary: [logreg, gnb, knn, dtree, rf, svm_rbf, xgb, mlp]
+  extra: [hgb, extratrees, ordinal_logit]
+  reference: [dummy_prior, dummy_stratified]
+
+  groups:
+    simple: [logreg, gnb, knn, dtree]
+    complex: [rf, svm_rbf, xgb, mlp]
+
+  # Stratified subsample of the TRAIN partition only (validation/test always complete).
+  # Documented deviation used when a model is too expensive at full size.
+  subsample:
+    svm_rbf: {n: 30000, hpo: true, final: true}
+
+  # Parameters that are fixed (not searched).
+  fixed:
+    logreg: {max_iter: 3000}
+    gnb: {}
+    knn: {}
+    dtree: {}
+    rf: {}
+    svm_rbf: {cache_size: 2000}
+    xgb: {tree_method: hist, objective: "multi:softprob", eval_metric: mlogloss}
+    mlp: {early_stopping: true, validation_fraction: 0.1, n_iter_no_change: 10, max_iter: 300}
+    hgb: {}
+    extratrees: {}
+    ordinal_logit: {max_iter: 500}
+    dummy_prior: {strategy: prior}
+    dummy_stratified: {strategy: stratified}
+
+  # Random-search spaces. Types: loguniform, uniform, intuniform, intloguniform, choice.
+  spaces:
+    logreg:
+      C: {type: loguniform, low: 1.0e-4, high: 100.0}
+    gnb:
+      var_smoothing: {type: loguniform, low: 1.0e-12, high: 1.0e-2}
+    knn:
+      n_neighbors: {type: intloguniform, low: 5, high: 300}
+      weights: {type: choice, values: [uniform, distance]}
+      p: {type: choice, values: [1, 2]}
+    dtree:
+      max_depth: {type: choice, values: [3, 5, 8, 12, 16, 24, null]}
+      min_samples_leaf: {type: intloguniform, low: 1, high: 2000}
+      criterion: {type: choice, values: [gini, entropy]}
+    rf:
+      n_estimators: {type: choice, values: [200, 400]}
+      max_depth: {type: choice, values: [8, 12, 16, 24, null]}
+      min_samples_leaf: {type: intloguniform, low: 1, high: 500}
+      max_features: {type: choice, values: [sqrt, 0.5, 1.0]}
+    svm_rbf:
+      C: {type: loguniform, low: 1.0e-2, high: 1.0e3}
+      gamma: {type: loguniform, low: 1.0e-4, high: 10.0}
+    xgb:
+      n_estimators: {type: intuniform, low: 100, high: 800}
+      max_depth: {type: intuniform, low: 2, high: 10}
+      learning_rate: {type: loguniform, low: 0.01, high: 0.3}
+      subsample: {type: uniform, low: 0.5, high: 1.0}
+      colsample_bytree: {type: uniform, low: 0.5, high: 1.0}
+      min_child_weight: {type: loguniform, low: 1.0, high: 100.0}
+      reg_lambda: {type: loguniform, low: 1.0e-3, high: 10.0}
+    mlp:
+      hidden_layer_sizes: {type: choice, values: [[32], [64], [128], [64, 32], [128, 64]]}
+      alpha: {type: loguniform, low: 1.0e-6, high: 1.0e-2}
+      learning_rate_init: {type: loguniform, low: 1.0e-4, high: 1.0e-2}
+      batch_size: {type: choice, values: [256, 512, 1024]}
+    hgb:
+      learning_rate: {type: loguniform, low: 0.01, high: 0.3}
+      max_leaf_nodes: {type: intloguniform, low: 8, high: 128}
+      min_samples_leaf: {type: intloguniform, low: 10, high: 500}
+      l2_regularization: {type: loguniform, low: 1.0e-6, high: 10.0}
+      max_iter: {type: choice, values: [200, 400]}
+    extratrees:
+      n_estimators: {type: choice, values: [200, 400]}
+      max_depth: {type: choice, values: [8, 12, 16, 24, null]}
+      min_samples_leaf: {type: intloguniform, low: 1, high: 500}
+      max_features: {type: choice, values: [sqrt, 0.5, 1.0]}
+    ordinal_logit:
+      alpha: {type: loguniform, low: 1.0e-6, high: 1.0e-1}
+    dummy_prior: {}
+    dummy_stratified: {}

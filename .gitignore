@@ -1,0 +1,54 @@
+# =====================================================================================
+# DATA GOVERNANCE (PhysioNet Credentialed Health Data Use Agreement 1.5.0)
+# MIMIC-IV-ED is credentialed data. NOTHING derived per patient/stay may enter git.
+# Verified by scripts/check_gitignore.sh and by .githooks/pre-commit.
+# =====================================================================================
+*.csv
+*.csv.gz
+*.tsv
+*.gz
+*.zip
+*.parquet
+*.feather
+*.arrow
+*.pkl
+*.pickle
+*.joblib
+*.npy
+*.npz
+*.h5
+*.hdf5
+*.db
+*.sqlite
+*.sqlite3
+/data/
+/datasets/
+/outputs/
+**/private/
+predictions*
+excluded_*
+
+# Python / tooling
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+htmlcov/
+
+# Logs and scratch
+*.log
+*.log.*
+*.tmp
+.tmp*/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

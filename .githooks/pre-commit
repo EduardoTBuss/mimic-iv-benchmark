@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Blocks data-like files from being committed (PhysioNet DUA).
+# Enabled by `make setup` / `git config core.hooksPath .githooks`.
+set -uo pipefail
+bad=0
+while IFS= read -r -d '' f; do
+  case "$f" in
+    *.csv|*.csv.gz|*.gz|*.zip|*.parquet|*.feather|*.arrow|*.pkl|*.pickle|*.joblib|*.npy|*.npz|*.db|*.sqlite|*.sqlite3|data/*|datasets/*|outputs/*|*/private/*)
+      echo "BLOCKED (data-like path): $f"; bad=1;;
+  esac
+  size=$(git cat-file -s ":$f" 2>/dev/null || echo 0)
+  if [ "$size" -gt 2000000 ]; then echo "BLOCKED (> 2 MB): $f"; bad=1; fi
+  # MIMIC subject_id (1xxxxxxx) followed by stay_id (3xxxxxxx), as in a raw CSV row
+  if git show ":$f" 2>/dev/null | grep -qE '(^|[^0-9_])1[0-9]{7}[,;\t ]+3[0-9]{7}([^0-9_]|$)'; then
+    echo "BLOCKED (looks like subject_id,stay_id rows): $f"; bad=1
+  fi
+done < <(git diff --cached --name-only -z --diff-filter=ACM)
+[ "$bad" -eq 0 ] || echo "pre-commit: data governance check failed (see docs/data_governance.md)"
+exit "$bad"

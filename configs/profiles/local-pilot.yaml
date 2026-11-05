@@ -1,0 +1,12 @@
+# Quick end-to-end run on REAL data on the notebook (8 GB RAM): 5% of patients, 1 seed,
+# 2 configurations. Validates the pipeline; its numbers are NOT results.
+campaign: {tag: local-pilot}
+prepare: {sample_fraction: 0.05}
+split: {seeds: [1], priority_seeds: 1}
+hpo: {n_configs: 2}
+models:
+  subsample:
+    svm_rbf: {n: 3000, hpo: true, final: true}
+evaluation:
+  cost_benchmark: {enabled: false}
+resources: {max_workers: 3, reserve_cpus: 2, min_free_ram_gb: 1.5}

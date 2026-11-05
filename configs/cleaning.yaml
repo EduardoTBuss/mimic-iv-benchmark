@@ -1,0 +1,70 @@
+# Data-cleaning rules. Every rule is logged with counts before/after (reports/data_preparation.md)
+# and every removed row is kept in outputs/prepared/<hash>/private/excluded_*.parquet.
+#
+# Value rules NEVER delete a stay: implausible values become missing (NaN) and are imputed
+# inside the training pipeline. Only an absent/invalid acuity removes a stay (variant A).
+
+cleaning:
+  reference: >-
+    Two-tier outlier rule and default ranges from Xie et al. (2022), Sci Data 9:658,
+    mimic4ed-benchmark/Benchmark_scripts/data_general_processing.py (ranges inherited from
+    MIMIC-Extract). Xie et al. work in Celsius; the temperature thresholds below are the
+    same values converted to Fahrenheit (MIMIC-IV-ED stores Fahrenheit).
+
+  temperature_unit: F
+  # Values inside this raw range are interpreted as entries typed in Celsius.
+  celsius_like_range: [25.0, 45.0]
+  celsius_like_action: convert      # convert (C -> F) | nan | keep   [decided after the audit]
+
+  # outside [outlier_low, outlier_high] -> NaN ; between an outlier bound and the valid
+  # bound -> clipped to the valid bound (Xie et al. 2022).
+  ranges:
+    temperature: {outlier_low: 57.56, valid_low: 78.8, valid_high: 113.0, outlier_high: 116.6}
+    heartrate:   {outlier_low: 0, valid_low: 0, valid_high: 350, outlier_high: 390}
+    resprate:    {outlier_low: 0, valid_low: 0, valid_high: 300, outlier_high: 330}
+    o2sat:       {outlier_low: 0, valid_low: 0, valid_high: 100, outlier_high: 150}
+    sbp:         {outlier_low: 0, valid_low: 0, valid_high: 375, outlier_high: 375}
+    dbp:         {outlier_low: 0, valid_low: 0, valid_high: 375, outlier_high: 375}
+
+  zero_to_nan: []                   # e.g. [heartrate, resprate]   [decided after the audit]
+  dbp_ge_sbp_action: none           # none | nan_both              [decided after the audit]
+
+  # AUDIT ONLY (never applied): tighter clinical plausibility bands used to inspect the data.
+  clinical_reference:
+    temperature: [86.0, 110.0]
+    heartrate: [20, 250]
+    resprate: [4, 60]
+    o2sat: [50, 100]
+    sbp: [50, 250]
+    dbp: [20, 150]
+
+  pain:
+    min: 0
+    max: 10
+    range_policy: mean              # "5-6" -> 5.5 (kind = range, status = numeric)
+    # Matched (case-insensitive, regex search) on the normalized string; refined after the audit.
+    unable_patterns:
+      - "unable"
+      - "unabl"
+      - "\\buta\\b"
+      - "\\bu/?a\\b"
+      - "unrespons"
+      - "intubat"
+      - "sedat"
+      - "non-?verbal"
+      - "aphasi"
+      - "unconscious"
+    # parser kind -> model feature status
+    status_map:
+      numeric: numeric
+      range: numeric
+      fraction: numeric
+      missing: missing
+      unable: unable
+      out_of_range: other
+      text_other: other
+    status_categories: [numeric, missing, unable, other]
+
+  audit:
+    top_pain_strings: 60
+    quantiles: [0.001, 0.01, 0.05, 0.25, 0.5, 0.75, 0.95, 0.99, 0.999]

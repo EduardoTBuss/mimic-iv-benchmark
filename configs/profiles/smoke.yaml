@@ -1,0 +1,10 @@
+# End-to-end check on SYNTHETIC data (CI, server pre-flight). Never touches MIMIC.
+campaign: {tag: smoke}
+split: {seeds: [1, 2], priority_seeds: 1}
+hpo: {n_configs: 2}
+models:
+  subsample:
+    svm_rbf: {n: 400, hpo: true, final: true}
+evaluation:
+  cost_benchmark: {enabled: true, repeats: 1}
+resources: {max_workers: 2, reserve_cpus: 0, min_free_ram_gb: 0.5, poll_seconds: 1, launch_interval_seconds: 0}
