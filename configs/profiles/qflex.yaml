@@ -4,7 +4,7 @@ dataset:
   zip_path: ${HOME}/mimic-iv-benchmark/data/zip/mimic-iv-ed-2.2.zip
   extract_dir: ${HOME}/mimic-iv-benchmark/data/extracted
 resources:
-  max_workers: 8
+  max_workers: 22           # 32 threads; load guard below keeps 4 free for other users
   threads_per_worker: 1
   reserve_cpus: 4
   min_free_ram_gb: 16

@@ -93,7 +93,9 @@ def run_all(cfg: dict, force: bool = False, filters: dict | None = None, max_wor
         log.warning("interrupted: analysis skipped (re-run to resume)")
         return summary
     cdir = Path(summary["campaign"])
-    if not any((filters or {}).values()):
+    cb = cfg["evaluation"].get("cost_benchmark") or {}
+    f = filters or {}
+    if (not f.get("variants") or cb.get("variant") in f["variants"]) and (not f.get("seeds") or cb.get("seed") in f["seeds"]):
         run_cost_stage(cfg, cdir, prepared)
     summary["report"] = str(analyze_and_report(cfg, cdir))
     log.info("report: %s", summary["report"])

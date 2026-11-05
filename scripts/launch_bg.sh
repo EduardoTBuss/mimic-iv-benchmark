@@ -6,6 +6,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PROFILE="${1:-}"
+shift || true
+EXTRA="$*"                       # extra run-all arguments, e.g. --variants A_keep_encode,B_pain_numeric_only
 SESSION="${SESSION:-triagebench}"
 PY="${PY:-.venv/bin/python}"
 if [ -d ../launch-logs ]; then LOGDIR="${LOGDIR:-../launch-logs}"; else LOGDIR="${LOGDIR:-launch-logs}"; fi   # server layout: ~/mimic-iv-benchmark/launch-logs
@@ -13,7 +15,7 @@ mkdir -p "$LOGDIR"
 LOG="$LOGDIR/run-all-$(date +%Y%m%d-%H%M%S).log"
 PROFILE_ARG=""
 [ -n "$PROFILE" ] && PROFILE_ARG="--profile $PROFILE"
-CMD="PYTHONPATH=src $PY -m triagebench run-all --config configs/main.yaml $PROFILE_ARG >> '$LOG' 2>&1; echo \"EXIT=\$? \$(date -Is)\" >> '$LOG'"
+CMD="PYTHONPATH=src $PY -m triagebench run-all --config configs/main.yaml $PROFILE_ARG $EXTRA >> '$LOG' 2>&1; echo \"EXIT=\$? \$(date -Is)\" >> '$LOG'"
 
 if command -v tmux >/dev/null 2>&1; then
   if tmux has-session -t "$SESSION" 2>/dev/null; then

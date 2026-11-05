@@ -32,6 +32,16 @@ Defaults do plano não contestados: seleção por Macro-F1 na validação, 20 co
 modelo (calibrado pelo piloto e congelado antes da campanha), H1 simples {LR, NB, KNN, DT} ×
 complexos {RF, SVM, XGB, MLP} com δ = 0,01, SVM-RBF em subamostra de 30 mil do treino.
 
+## Execução (05/11, decidido pelo custo do piloto, sem olhar métricas)
+
+O piloto no x299 (variante A, seed 1, 3 configs) mediu ~350 s por ajuste do SVM (subamostra de
+30 mil), ~90 s do RF e ~30 s do MLP → 300–400 horas de núcleo para as 810 tarefas. Com os 2
+workers que a temperatura do x299 permite (4 workers chegaram a 90 °C), seriam 6–8 dias, além do
+corte de 10/11. Divisão: **Q-FLEX roda A e B** (até 22 workers, recua sozinho se a máquina for
+usada), **x299 roda C** (2 workers). Mesma configuração científica → mesmo id de campanha; as
+tarefas de C são reunidas à campanha do Q-FLEX antes da análise final. As métricas do piloto
+não foram abertas.
+
 ## Fluxo de um experimento
 
 ```
