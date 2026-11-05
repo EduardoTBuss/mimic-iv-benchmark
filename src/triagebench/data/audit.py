@@ -179,11 +179,14 @@ def build_audit(triage: pd.DataFrame, load_report: dict, consistency: dict, inge
 
 
 def _acuity_row(label: str, counts: dict, k: int, total: int | None = None) -> list[str]:
-    row = [label] + [mask_count(counts.get(lv, 0), k) for lv in LEVEL_KEYS]
-    n = sum(counts.get(lv, 0) for lv in LEVEL_KEYS)
-    row.append(mask_count(n, k))
+    cells = [counts.get(lv, 0) for lv in LEVEL_KEYS]
+    row = [label] + [mask_count(c, k) for c in cells]
+    n = sum(cells)
+    # complementary suppression: with one masked cell, the row total would reveal it
+    any_masked = any(0 < c < k for c in cells)
+    row.append("—" if any_masked and n >= k else mask_count(n, k))
     if total is not None:
-        row.append(mask_pct(n, total, k))
+        row.append("—" if any_masked else mask_pct(n, total, k))
     return row
 
 

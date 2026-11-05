@@ -127,10 +127,13 @@ def run_task(task, ctx: TaskContext) -> dict:
               "params": best["params"], "science_hash": ctx.science_hash}
     frozen_hash = stable_hash(frozen)
 
-    pipe, (pred_val, pred_test), fit_s, (pred_val_s, pred_test_s), warn = _fit_predict(
+    pipe, (pred_val,), fit_s, (pred_val_s,), warn = _fit_predict(
         task.model, best["params"], task.strategy, ctx, vcfg, model_seed, X["train"], y_tr_enc,
-        [X["val"], X["test"]], final_cap)
-    access = guard_test_access(task_dir, frozen_hash)
+        [X["val"]], final_cap)
+    access = guard_test_access(task_dir, frozen_hash)  # the test partition is touched only after this
+    t_test = time.perf_counter()
+    pred_test = np.asarray(pipe.predict(X["test"])).astype(int) + 1
+    pred_test_s = time.perf_counter() - t_test
     m_val = compute_metrics(y["val"], pred_val)
     m_test = compute_metrics(y["test"], pred_test)
 

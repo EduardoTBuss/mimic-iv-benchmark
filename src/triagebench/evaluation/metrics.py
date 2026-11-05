@@ -25,6 +25,18 @@ def compute_metrics(y_true, y_pred, labels: tuple[int, ...] = LABELS) -> dict:
     y_pred = np.asarray(y_pred, dtype=int)
     labels = list(labels)
     n = int(y_true.size)
+    if n == 0:
+        nan = float("nan")
+        out = {"n": 0, **{k: nan for k in ("accuracy", "balanced_accuracy", "macro_f1", "weighted_f1", "qwk",
+                                            "mae_ordinal", "under_triage_rate", "over_triage_rate",
+                                            "severe_under_triage_rate", "under_triage_rate_urgent",
+                                            "adjacent_error_share")}}
+        for lab in labels:
+            out.update({f"precision_{lab}": nan, f"recall_{lab}": nan, f"f1_{lab}": nan,
+                        f"support_{lab}": 0, f"predicted_{lab}": 0})
+        out["confusion"] = [[0] * len(labels) for _ in labels]
+        out["abs_error_counts"] = {str(k): 0 for k in range(len(labels))}
+        return out
     d = y_pred - y_true
     errors = d != 0
     prec, rec, f1, sup = precision_recall_fscore_support(y_true, y_pred, labels=labels, zero_division=0)

@@ -53,8 +53,21 @@ def atomic_write_text(path: str | Path, text: str) -> Path:
     return atomic_write_bytes(path, text.encode("utf-8"))
 
 
+def _finite(obj: Any) -> Any:
+    """Replace non-finite floats (NaN/inf, including numpy float64) by None, recursively."""
+    if isinstance(obj, float):
+        return obj if np.isfinite(obj) else None
+    if isinstance(obj, np.floating):
+        return float(obj) if np.isfinite(obj) else None
+    if isinstance(obj, dict):
+        return {k: _finite(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_finite(v) for v in obj]
+    return obj
+
+
 def dumps_json(obj: Any) -> str:
-    return json.dumps(obj, indent=2, sort_keys=True, default=json_default, allow_nan=False) + "\n"
+    return json.dumps(_finite(obj), indent=2, sort_keys=True, default=json_default, allow_nan=False) + "\n"
 
 
 def atomic_write_json(path: str | Path, obj: Any) -> Path:
@@ -80,7 +93,12 @@ def append_jsonl(path: str | Path, obj: Any) -> None:
     """Append one JSON line and fsync (a crash can only truncate the last line)."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    line = json.dumps(obj, sort_keys=True, default=json_default) + "\n"
+    line = json.dumps(_finite(obj), sort_keys=True, default=json_default) + "\n"
+    if path.exists() and path.stat().st_size > 0:
+        with open(path, "rb") as fh:
+            fh.seek(-1, os.SEEK_END)
+            if fh.read(1) != b"\n":  # a crash truncated the last line: start a fresh one
+                line = "\n" + line
     with open(path, "a", encoding="utf-8") as fh:
         fh.write(line)
         fh.flush()
