@@ -61,3 +61,20 @@ bash scripts/fetch_results.sh x299 <campaign-id>
 
 Copia `outputs/campaigns/<id>` sem nenhum `private/` para `outputs/remote/x299/` (gitignored) e o
 relatório agregado para `reports/campaigns/<id>/` (pode ir ao git).
+
+## Campanha `main-38c9f7c0a8` (lançada em 05/11 00:38) — fechamento
+
+- Q-FLEX: variantes A+B (tmux `triagebench`, código `code/` @ ae4b22d). Ao terminar, o `run-all` roda o benchmark
+  de custo e uma análise; depois o **finalizador** (tmux `triagebench-finisher`, `~/mimic-iv-benchmark/finisher.sh`)
+  roda importância por permutação + análise completa com `code-next/` (@ 8a831d0). Log: `launch-logs/finisher-*.log`.
+- x299: variante C (nohup, `code/` @ ae4b22d), 2 workers.
+- Quando o x299 terminar C (precisa de uma sessão no notebook, porque os servidores não se enxergam):
+
+```bash
+DST_SSH=/c/Windows/System32/OpenSSH/ssh.exe DST_CODE=code-next \
+  bash scripts/merge_remote.sh x299 qflex main-38c9f7c0a8 'C_values_only__*'
+/c/Windows/System32/OpenSSH/ssh.exe qflex 'cd ~/mimic-iv-benchmark/code-next && \
+  PYTHONPATH=src .venv/bin/python -m triagebench analyze --config configs/main.yaml --profile qflex'
+SSH=/c/Windows/System32/OpenSSH/ssh.exe bash scripts/fetch_results.sh qflex main-38c9f7c0a8
+git add reports/campaigns/main-38c9f7c0a8 && git commit -m "Results: campaign main-38c9f7c0a8"
+```
