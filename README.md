@@ -1,4 +1,4 @@
-# ed-triage-benchmark
+# mimic-iv-benchmark
 
 Reproducible benchmark of tabular machine-learning models for **emergency-department triage
 acuity prediction** (ESI-like levels 1–5, ordinal) from the structured triage vital signs of

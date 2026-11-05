@@ -9,7 +9,7 @@ treinamento CITI "Data or Specimens Only Research"). Regras deste projeto:
    linha excluída, nem modelo treinado. O repositório só tem código, configuração e relatórios
    **agregados** com máscara de células pequenas.
 2. **Dados fora do repositório**: notebook `C:\datasets\mimic-iv-ed\` (zip + extraído);
-   servidores `~/ed-triage/data/` com permissão 700. A CLI aplica `umask 077` no Linux.
+   servidores `~/mimic-iv-benchmark/data/` com permissão 700. A CLI aplica `umask 077` no Linux.
 3. **Nada de LLM/serviço online lendo dado.** O assistente (Claude Code) só vê saídas
    agregadas de scripts (contagens, percentuais, quantis, métricas). A política do PhysioNet
    (18/04/2023) proíbe enviar dados a APIs de terceiros como a OpenAI; por isso **Codex e
@@ -19,14 +19,14 @@ treinamento CITI "Data or Specimens Only Research"). Regras deste projeto:
    `outputs/` (relatórios, figuras, git); percentuais derivados delas viram `—`.
 5. **Se algum passo exigir olhar linhas**, ele não é feito pelo assistente: o Eduardo roda e
    relata o agregado.
-6. **Servidores**: só contas pessoais (Q-FLEX `etbuss`; x299 `eduardobuss` apenas como reserva).
+6. **Servidores**: só contas pessoais do Eduardo, pasta `~/mimic-iv-benchmark` com permissão 700 (x299 principal, Q-FLEX reserva).
    Nunca a conta compartilhada `alunospcv2026` do gacig6. Nada em `/tmp`.
 
 ## Onde cada coisa fica
 
 | Artefato | Local | Git? |
 |---|---|---|
-| zip e CSVs originais | `C:\datasets\mimic-iv-ed\`, `~/ed-triage/data/` | nunca |
+| zip e CSVs originais | `C:\datasets\mimic-iv-ed\`, `~/mimic-iv-benchmark/data/` | nunca |
 | dado limpo, linhas excluídas, partições | `outputs/prepared/<hash>/private/` | nunca |
 | predições por estadia, modelos | `outputs/campaigns/<id>/**/private/` | nunca |
 | métricas por tarefa/seed, HPO, tempos (agregados) | `outputs/campaigns/<id>/tables/` | não (ficam com a campanha) |

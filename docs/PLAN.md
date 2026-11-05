@@ -24,7 +24,9 @@ Escopo deste repositório: **código e experimentos**; o artigo não é escrito 
 | Faixas fisiológicas | analisar com os dados antes de fixar; o modelo só recebe número |
 | Servidor | Q-FLEX (zip enviado do notebook, pasta organizada no usuário); x299 liberado como reserva |
 | GitHub | repositório privado com commits frequentes para mostrar progresso |
-| Nome | `ed-triage-benchmark` (pacote `triagebench`), proposto pelo maestro |
+| Nome | `mimic-iv-benchmark` (escolha do Eduardo em 05/11; pacote `triagebench`); repositório pode ser público |
+| Servidor (05/11) | **x299 principal** (pasta organizada `~/mimic-iv-benchmark`); se cair, Q-FLEX |
+| HPO (05/11) | vários hiperparâmetros por modelo (1–9, ver `configs/models.yaml`), não só taxa de aprendizado |
 
 Defaults do plano não contestados: seleção por Macro-F1 na validação, 20 configurações por
 modelo (calibrado pelo piloto e congelado antes da campanha), H1 simples {LR, NB, KNN, DT} ×

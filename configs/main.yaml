@@ -1,4 +1,4 @@
-# ed-triage-benchmark - main configuration (single source of truth).
+# mimic-iv-benchmark - main configuration (single source of truth).
 #
 # Every section listed in triagebench.utils.config.SCIENCE_SECTIONS is hashed into the
 # campaign id: changing any of them creates a NEW campaign (old results are never

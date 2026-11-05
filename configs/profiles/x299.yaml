@@ -1,8 +1,8 @@
-# x299 (Bruno). Known to crash under sustained CPU load (95 C, see Brain wiki/servidor-x299.md).
+# x299 (primary server since 05/11). Known to crash under sustained CPU load (95 C, see Brain wiki/servidor-x299.md).
 # Few workers + thermal guard: no new task is launched while any CPU sensor is above the limit.
 dataset:
-  zip_path: /home/eduardobuss/ed-triage/data/zip/mimic-iv-ed-2.2.zip
-  extract_dir: /home/eduardobuss/ed-triage/data/extracted
+  zip_path: ${HOME}/mimic-iv-benchmark/data/zip/mimic-iv-ed-2.2.zip
+  extract_dir: ${HOME}/mimic-iv-benchmark/data/extracted
 resources:
   max_workers: 4
   threads_per_worker: 1
@@ -11,5 +11,5 @@ resources:
   max_cpu_temp_c: 78
   nice: 15
 paths:
-  outputs: /home/eduardobuss/ed-triage/outputs
-  reports: /home/eduardobuss/ed-triage/reports
+  outputs: ${HOME}/mimic-iv-benchmark/outputs
+  reports: ${HOME}/mimic-iv-benchmark/reports

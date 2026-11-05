@@ -1,8 +1,8 @@
-# Q-FLEX (UFPel), account etbuss. CPU only; shares the machine with other jobs.
+# Q-FLEX (UFPel), personal account. CPU only; shares the machine with other jobs (fallback server).
 # Concurrency can be changed live in outputs/campaigns/<id>/control.yaml (max_workers, pause).
 dataset:
-  zip_path: /home/etbuss/ed-triage/data/zip/mimic-iv-ed-2.2.zip
-  extract_dir: /home/etbuss/ed-triage/data/extracted
+  zip_path: ${HOME}/mimic-iv-benchmark/data/zip/mimic-iv-ed-2.2.zip
+  extract_dir: ${HOME}/mimic-iv-benchmark/data/extracted
 resources:
   max_workers: 8
   threads_per_worker: 1
@@ -11,5 +11,5 @@ resources:
   max_cpu_temp_c: 90
   nice: 10
 paths:
-  outputs: /home/etbuss/ed-triage/outputs
-  reports: /home/etbuss/ed-triage/reports
+  outputs: ${HOME}/mimic-iv-benchmark/outputs
+  reports: ${HOME}/mimic-iv-benchmark/reports
