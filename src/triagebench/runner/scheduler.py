@@ -53,13 +53,32 @@ class Summary:
 
 
 def cpu_temperature() -> float | None:
+    """CPU package temperature (Intel "Package id", AMD "Tctl"/"Tdie"); falls back to the hottest
+    core. Single-core turbo spikes make per-core readings jump 35 <-> 90 C within seconds."""
     try:
         sensors = psutil.sensors_temperatures()
     except (AttributeError, OSError):
         return None
-    temps = [t.current for name, entries in (sensors or {}).items()
-             if name in ("coretemp", "k10temp", "zenpower", "cpu_thermal", "acpitz") for t in entries if t.current]
+    cpu = {k: v for k, v in (sensors or {}).items() if k in ("coretemp", "k10temp", "zenpower", "cpu_thermal")}
+    package = [t.current for entries in cpu.values() for t in entries
+               if t.current and (t.label or "").startswith(("Package", "Tctl", "Tdie"))]
+    if package:
+        return max(package)
+    temps = [t.current for entries in cpu.values() for t in entries if t.current]
     return max(temps) if temps else None
+
+
+class SmoothedTemperature:
+    """Mean of the last ``window`` readings (one per scheduler poll)."""
+
+    def __init__(self, window: int = 6):
+        self.window, self.values = window, []
+
+    def update(self) -> float | None:
+        t = cpu_temperature()
+        if t is not None:
+            self.values = (self.values + [t])[-self.window:]
+        return sum(self.values) / len(self.values) if self.values else None
 
 
 def load_average() -> float:
@@ -69,7 +88,7 @@ def load_average() -> float:
         return psutil.getloadavg()[0]
 
 
-def resources_ok(res: dict, path: Path | None = None) -> tuple[bool, str]:
+def resources_ok(res: dict, path: Path | None = None, temp: float | None = None) -> tuple[bool, str]:
     if path is not None and res.get("min_free_disk_gb"):
         free = psutil.disk_usage(str(path)).free / 2**30
         if free < float(res["min_free_disk_gb"]):
@@ -84,10 +103,8 @@ def resources_ok(res: dict, path: Path | None = None) -> tuple[bool, str]:
         if load > ncpu - float(reserve):
             return False, f"load {load:.1f} > {ncpu} - {reserve}"
     limit = res.get("max_cpu_temp_c")
-    if limit:
-        temp = cpu_temperature()
-        if temp is not None and temp > float(limit):
-            return False, f"CPU {temp:.0f} C > {limit} C"
+    if limit and temp is not None and temp > float(limit):
+        return False, f"CPU {temp:.0f} C (1-min mean) > {limit} C"
     return True, ""
 
 
@@ -182,6 +199,7 @@ def run_scheduler(cdir: Path, prepared: Path, tasks: list[Task], res: dict) -> d
             pending.append(t)
         running: dict[str, Running] = {}
         last_launch, guard = 0.0, ""
+        thermo = SmoothedTemperature(int(res.get("temp_window_polls", 6)))
         log.info("campaign %s: %d to run, %d already done, %d failed earlier", cdir.name, len(pending),
                  summary.skipped_done, summary.failed)
 
@@ -213,7 +231,7 @@ def run_scheduler(cdir: Path, prepared: Path, tasks: list[Task], res: dict) -> d
                 else:
                     pending.append(r.task)
 
-            temp = cpu_temperature() if hard_temp else None
+            temp = thermo.update() if res.get("max_cpu_temp_c") else None
             if hard_temp and temp is not None:
                 if temp > hard_temp and not any(r.suspended for r in running.values()):
                     log.warning("thermal emergency %.0f C > %.0f C: suspending %d workers", temp, hard_temp, len(running))
@@ -225,7 +243,7 @@ def run_scheduler(cdir: Path, prepared: Path, tasks: list[Task], res: dict) -> d
             ctrl = read_control(cdir, int(res.get("max_workers", 1)))
             if (not ctrl["pause"] and pending and len(running) < ctrl["max_workers"]
                     and time.time() - last_launch >= interval and not any(r.suspended for r in running.values())):
-                ok, guard = resources_ok(res, cdir)
+                ok, guard = resources_ok(res, cdir, temp)
                 limits = res.get("max_concurrent_per_model") or {}
                 active = [r.task.model for r in running.values()]
                 idx = next((i for i, t in enumerate(pending)

@@ -4,13 +4,13 @@ dataset:
   zip_path: ${HOME}/mimic-iv-benchmark/data/zip/mimic-iv-ed-2.2.zip
   extract_dir: ${HOME}/mimic-iv-benchmark/data/extracted
 resources:
-  max_workers: 4
+  max_workers: 2            # pilot 05/11: 4 single-thread workers reached 90 C (crash at ~95 C)
   threads_per_worker: 1
   reserve_cpus: 6
   min_free_ram_gb: 6
   min_free_disk_gb: 5        # /home was 95% full on 05/11
   max_concurrent_per_model: {rf: 1, extratrees: 1}   # 31 GB RAM
-  max_cpu_temp_c: 78
+  max_cpu_temp_c: 75         # 1-min mean of the package sensor; suspend all workers above 85
   nice: 15
 paths:
   outputs: ${HOME}/mimic-iv-benchmark/outputs
