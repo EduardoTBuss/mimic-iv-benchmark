@@ -17,6 +17,7 @@ models:
   # Documented deviation used when a model is too expensive at full size.
   subsample:
     svm_rbf: {n: 30000, hpo: true, final: true}
+    knn: {n: 100000, hpo: true, final: false}   # HPO only (with oversampling the full train is ~785k rows)
 
   # Parameters that are fixed (not searched).
   fixed:
