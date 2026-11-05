@@ -8,6 +8,8 @@ resources:
   threads_per_worker: 1
   reserve_cpus: 6
   min_free_ram_gb: 6
+  min_free_disk_gb: 5        # /home was 95% full on 05/11
+  max_concurrent_per_model: {rf: 1, extratrees: 1}   # 31 GB RAM
   max_cpu_temp_c: 78
   nice: 15
 paths:

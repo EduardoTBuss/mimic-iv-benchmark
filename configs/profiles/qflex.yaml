@@ -8,6 +8,7 @@ resources:
   threads_per_worker: 1
   reserve_cpus: 4
   min_free_ram_gb: 16
+  min_free_disk_gb: 20
   max_cpu_temp_c: 90
   nice: 10
 paths:

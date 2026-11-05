@@ -102,6 +102,7 @@ resources:                   # runtime only (not hashed)
   threads_per_worker: 1
   reserve_cpus: 2            # do not launch if 1-min load > n_cpus - reserve
   min_free_ram_gb: 2
+  min_free_disk_gb: 2
   max_cpu_temp_c: null       # e.g. 80 on the x299
   nice: 10
   task_timeout_hours: 24

@@ -69,7 +69,11 @@ def load_average() -> float:
         return psutil.getloadavg()[0]
 
 
-def resources_ok(res: dict) -> tuple[bool, str]:
+def resources_ok(res: dict, path: Path | None = None) -> tuple[bool, str]:
+    if path is not None and res.get("min_free_disk_gb"):
+        free = psutil.disk_usage(str(path)).free / 2**30
+        if free < float(res["min_free_disk_gb"]):
+            return False, f"free disk {free:.1f} GB < {res['min_free_disk_gb']}"
     avail = psutil.virtual_memory().available / 2**30
     if avail < float(res.get("min_free_ram_gb", 0)):
         return False, f"free RAM {avail:.1f} GB < {res['min_free_ram_gb']}"
@@ -221,7 +225,7 @@ def run_scheduler(cdir: Path, prepared: Path, tasks: list[Task], res: dict) -> d
             ctrl = read_control(cdir, int(res.get("max_workers", 1)))
             if (not ctrl["pause"] and pending and len(running) < ctrl["max_workers"]
                     and time.time() - last_launch >= interval and not any(r.suspended for r in running.values())):
-                ok, guard = resources_ok(res)
+                ok, guard = resources_ok(res, cdir)
                 limits = res.get("max_concurrent_per_model") or {}
                 active = [r.task.model for r in running.values()]
                 idx = next((i for i, t in enumerate(pending)
