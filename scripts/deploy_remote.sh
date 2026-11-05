@@ -48,7 +48,12 @@ fi
   git checkout -q --detach $COMMIT
   if [ ! -x .venv/bin/python ] || ! cmp -s requirements-lock.txt .venv/.lock-installed; then
     rm -rf .venv
-    python3.12 -m venv .venv
+    if ! python3.12 -m venv .venv >/dev/null 2>&1; then
+      # no python3.12-venv/ensurepip and no sudo: bootstrap pip inside the venv only
+      rm -rf .venv
+      python3.12 -m venv --without-pip .venv
+      curl -fsSL https://bootstrap.pypa.io/get-pip.py | .venv/bin/python - -q
+    fi
     .venv/bin/python -m pip install -q --upgrade pip
     nice -n 10 .venv/bin/python -m pip install -q --require-hashes -r requirements-lock.txt
     cp requirements-lock.txt .venv/.lock-installed
