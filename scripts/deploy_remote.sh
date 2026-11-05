@@ -12,6 +12,7 @@ HOST="${1:?usage: deploy_remote.sh <ssh-alias> [zip]}"
 ZIP="${2:-}"
 SSH="${SSH:-ssh}"
 SCP="${SCP:-scp}"
+CODE_DIR="${CODE_DIR:-code}"     # e.g. CODE_DIR=code-next to deploy next to a running campaign
 cd "$(git rev-parse --show-toplevel)"
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   echo "working tree has uncommitted changes: commit first" >&2
@@ -42,8 +43,8 @@ fi
 
 "$SSH" "$HOST" "set -e; umask 077; cd mimic-iv-benchmark
   B=\$PWD/bundles/$BUNDLE_NAME
-  if [ ! -d code/.git ]; then rm -rf code; git clone -q \$B code; fi
-  cd code
+  if [ ! -d $CODE_DIR/.git ]; then rm -rf $CODE_DIR; git clone -q \$B $CODE_DIR; fi
+  cd $CODE_DIR
   git fetch -q \$B '+HEAD:refs/remotes/deploy/head'
   git checkout -q --detach $COMMIT
   if [ ! -x .venv/bin/python ] || ! cmp -s requirements-lock.txt .venv/.lock-installed; then

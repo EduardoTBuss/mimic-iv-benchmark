@@ -101,6 +101,36 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     return 0
 
 
+def _campaign_paths(args: argparse.Namespace, cfg: dict) -> tuple[Path, Path]:
+    from triagebench.runner.campaign import resolve_campaign_dir
+    from triagebench.utils.io import read_json
+
+    cdir = Path(args.campaign) if args.campaign else resolve_campaign_dir(cfg)
+    prepared = Path(cfg["paths"]["outputs"]) / "prepared" / read_json(cdir / "campaign.json")["prepared_id"]
+    return cdir, prepared
+
+
+def cmd_importance(args: argparse.Namespace) -> int:
+    from triagebench.analysis.aggregate import aggregate_campaign
+    from triagebench.analysis.importance import run_importance
+    from triagebench.utils.config import primary_variant
+
+    cfg = _cfg(args)
+    cdir, prepared = _campaign_paths(args, cfg)
+    tables = aggregate_campaign(cdir)
+    out = run_importance(cfg, cdir, prepared, tables["metrics"], primary_variant(cfg), n_repeats=args.repeats,
+                         workers=args.workers)
+    print(f"importance -> {out}")
+    return 0
+
+
+def cmd_merge(args: argparse.Namespace) -> int:
+    from triagebench.runner.merge import merge_campaign
+
+    print(json.dumps(merge_campaign(Path(args.campaign), Path(args.source)), indent=2))
+    return 0
+
+
 def cmd_smoke(args: argparse.Namespace) -> int:
     from triagebench.runner.pipeline import run_smoke
 
@@ -172,6 +202,18 @@ def build_parser() -> argparse.ArgumentParser:
     _common(p)
     p.add_argument("--campaign", help="campaign directory (default: derived from the config)")
     p.set_defaults(func=cmd_analyze)
+
+    p = sub.add_parser("importance", help="grouped permutation importance of the best simple/complex models (F5)")
+    _common(p)
+    p.add_argument("--campaign", help="campaign directory (default: derived from the config)")
+    p.add_argument("--repeats", type=int, default=5)
+    p.add_argument("--workers", type=int, default=8)
+    p.set_defaults(func=cmd_importance)
+
+    p = sub.add_parser("merge", help="copy DONE tasks of the same campaign computed on another machine")
+    p.add_argument("--campaign", required=True, help="destination campaign directory")
+    p.add_argument("--from", dest="source", required=True, help="source campaign directory (same science hash)")
+    p.set_defaults(func=cmd_merge)
 
     p = sub.add_parser("smoke", help="end-to-end run on synthetic data (no MIMIC needed)")
     p.add_argument("--workdir", default=None)

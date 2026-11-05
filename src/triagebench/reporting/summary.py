@@ -130,6 +130,33 @@ def _sensitivity_tables(cfg: dict, metrics: pd.DataFrame, timings: pd.DataFrame,
     return "\n".join(out) if out else "_sem resultados de sensibilidade_"
 
 
+def _importance_section(cdir: Path) -> str:
+    path = cdir / "tables" / "importance.parquet"
+    if not path.exists():
+        return "_não executada nesta campanha (`triagebench importance`)_"
+    from triagebench.analysis.importance import importance_markdown
+
+    return importance_markdown(pd.read_parquet(path))
+
+
+def _h1_secondary_section(cfg: dict, metrics: pd.DataFrame, variant: str) -> str:
+    if metrics.empty:
+        return "_—_"
+    from triagebench.analysis.secondary import h1_secondary_markdown, h1_validation_selected_strategy
+
+    return h1_secondary_markdown(h1_validation_selected_strategy(metrics, cfg, variant))
+
+
+def _decodings_section(cdir: Path, variant: str, order: list[str]) -> str:
+    from triagebench.analysis.secondary import decodings, decodings_markdown
+    from triagebench.utils.io import atomic_write_parquet
+
+    df = decodings(cdir, variant)
+    if not df.empty:
+        atomic_write_parquet(df, cdir / "tables" / "decodings.parquet")
+    return decodings_markdown(df, order)
+
+
 def _anomalies_md(tables: dict, stats: dict | None, variant: str) -> str:
     items = []
     f = tables["failures"]
@@ -233,7 +260,14 @@ def write_reports(cfg: dict, cdir: Path, tables: dict, stats: dict | None, prepa
         from triagebench.analysis.stats import render_stats_markdown
 
         lines += ["## Análise pré-registrada", "", render_stats_markdown(stats), ""]
-    lines += ["## Custo computacional", "", _cost_table(cdir), "",
+    lines += ["## Importância das variáveis por permutação agrupada (F5, teste, modelos escolhidos na validação)", "",
+              _importance_section(cdir), "",
+              "## Análises secundárias pré-registradas em 05/11 (descritivas)", "",
+              "### H1 com a estratégia escolhida na validação", "",
+              _h1_secondary_section(cfg, metrics, variant), "",
+              "### Decodificações alternativas a partir das probabilidades salvas (teste, média entre seeds)", "",
+              _decodings_section(cdir, variant, order), "",
+              "## Custo computacional", "", _cost_table(cdir), "",
               "## Busca de hiperparâmetros", "", _hpo_table(tables["hpo_trials"], order), "",
               "## Alertas e anomalias", "", _anomalies_md(tables, stats, variant), "",
               "## Figuras", ""] + [f"- `figures/{Path(f).name}`" for f in figs] + [""]

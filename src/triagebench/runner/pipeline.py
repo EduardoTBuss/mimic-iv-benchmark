@@ -97,6 +97,14 @@ def run_all(cfg: dict, force: bool = False, filters: dict | None = None, max_wor
     f = filters or {}
     if (not f.get("variants") or cb.get("variant") in f["variants"]) and (not f.get("seeds") or cb.get("seed") in f["seeds"]):
         run_cost_stage(cfg, cdir, prepared)
+    try:
+        from triagebench.analysis.aggregate import aggregate_campaign
+        from triagebench.analysis.importance import run_importance
+
+        run_importance(cfg, cdir, prepared, aggregate_campaign(cdir)["metrics"], primary_variant(cfg),
+                       workers=int(cfg["resources"].get("max_workers", 1)))
+    except Exception as exc:  # importance is complementary: never block the report
+        log.warning("permutation importance failed: %s", exc)
     summary["report"] = str(analyze_and_report(cfg, cdir))
     log.info("report: %s", summary["report"])
     return summary
