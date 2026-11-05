@@ -14,7 +14,7 @@
 | SHA256 do zip | `d17bbf2efe6a4a7e0f29c73b0743e6d2b7fb840e9b1a14f9064f23c70d868fc9` |
 | SHA256 triage.csv.gz | `fde3d5910215454feec9494fcd2248c3ff7d871001990a8ac43ef67289d4d0d3` |
 | SHA256 edstays.csv.gz | `33b3f4f07a075d725289241201fc39426437506688ebfc4cb69f45a5052a56d6` |
-| verificação SHA256SUMS.txt | todos os 8 arquivos OK (2026-11-05T02:23:09+00:00) |
+| verificação SHA256SUMS.txt | todos os 8 arquivos OK (2026-11-05T03:32:12+00:00) |
 
 ## 2. Schema e consistência
 
@@ -93,14 +93,14 @@ Faixas de Xie et al. (2022) (temperatura convertida para °F): abaixo/acima do l
 | faixa | acuity 1 | acuity 2 | acuity 3 | acuity 4 | acuity 5 | acuity ausente | total | % dos não ausentes |
 |---|---|---|---|---|---|---|---|---|
 | below_outlier_low (NaN) | 29 | 215 | 223 | 12 | 0 | 0 | 479 | 0.12% |
-| clip_to_valid_low | <11 | 12 | 15 | <11 | 0 | 0 | 29 | 0.01% |
+| clip_to_valid_low | <11 | 12 | 15 | <11 | 0 | 0 | — | — |
 | valid | 15,139 | 134,423 | 222,186 | 28,177 | 1,060 | 170 | 401,155 | 99.87% |
 | clip_to_valid_high | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00% |
 | above_outlier_high (NaN) | 0 | <11 | <11 | 0 | 0 | 0 | <11 | — |
 | clínica: abaixo de 86.0 | 37 | 236 | 242 | 15 | 0 | 0 | 530 | 0.13% |
-| clínica: acima de 110.0 | 0 | <11 | <11 | 0 | 0 | 0 | 13 | 0.00% |
+| clínica: acima de 110.0 | 0 | <11 | <11 | 0 | 0 | 0 | — | — |
 | valor exatamente 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00% |
-| parece °C: 25.0–45.0 | 22 | 188 | 174 | <11 | 0 | 0 | 392 | 0.10% |
+| parece °C: 25.0–45.0 | 22 | 188 | 174 | <11 | 0 | 0 | — | — |
 
 Valores com cara de °C: q0.05 / mediana / q0.95 = 35.9 / 36.6 / 37.7. Entre a faixa °C e o limite de outlier: <11.
 
@@ -117,7 +117,7 @@ Valores com cara de °C: q0.05 / mediana / q0.95 = 35.9 / 36.6 / 37.7. Entre a f
 | valid | 17,235 | 136,824 | 224,268 | 28,406 | 1,073 | 184 | 407,990 | 100.00% |
 | clip_to_valid_high | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00% |
 | above_outlier_high (NaN) | <11 | <11 | <11 | 0 | 0 | 0 | <11 | — |
-| clínica: abaixo de 20 | <11 | <11 | 12 | 0 | 0 | 0 | 22 | 0.01% |
+| clínica: abaixo de 20 | <11 | <11 | 12 | 0 | 0 | 0 | — | — |
 | clínica: acima de 250 | <11 | <11 | <11 | 0 | 0 | 0 | <11 | — |
 | valor exatamente 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00% |
 
@@ -134,8 +134,8 @@ Valores com cara de °C: q0.05 / mediana / q0.95 = 35.9 / 36.6 / 37.7. Entre a f
 | valid | 16,474 | 135,693 | 223,000 | 28,314 | 1,071 | 179 | 404,731 | 100.00% |
 | clip_to_valid_high | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00% |
 | above_outlier_high (NaN) | 0 | 0 | <11 | 0 | 0 | 0 | <11 | — |
-| clínica: abaixo de 4 | <11 | <11 | <11 | <11 | 0 | 0 | 19 | 0.00% |
-| clínica: acima de 60 | 0 | 13 | 23 | <11 | 0 | 0 | 39 | 0.01% |
+| clínica: abaixo de 4 | <11 | <11 | <11 | <11 | 0 | 0 | — | — |
+| clínica: acima de 60 | 0 | 13 | 23 | <11 | 0 | 0 | — | — |
 | valor exatamente 0 | 0 | <11 | <11 | <11 | 0 | 0 | <11 | — |
 
 ### o2sat
@@ -150,9 +150,9 @@ Valores com cara de °C: q0.05 / mediana / q0.95 = 35.9 / 36.6 / 37.7. Entre a f
 | clip_to_valid_low | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00% |
 | valid | 16,557 | 135,662 | 222,719 | 28,262 | 1,061 | 183 | 404,444 | 99.99% |
 | clip_to_valid_high | 0 | 0 | <11 | 0 | 0 | 0 | <11 | — |
-| above_outlier_high (NaN) | <11 | 11 | 25 | <11 | 0 | 0 | 41 | 0.01% |
-| clínica: abaixo de 50 | 11 | 35 | 40 | <11 | 0 | <11 | 92 | 0.02% |
-| clínica: acima de 100 | <11 | 11 | 31 | <11 | 0 | 0 | 47 | 0.01% |
+| above_outlier_high (NaN) | <11 | 11 | 25 | <11 | 0 | 0 | — | — |
+| clínica: abaixo de 50 | 11 | 35 | 40 | <11 | 0 | <11 | — | — |
+| clínica: acima de 100 | <11 | 11 | 31 | <11 | 0 | 0 | — | — |
 | valor exatamente 0 | <11 | <11 | <11 | 0 | 0 | 0 | <11 | — |
 
 ### sbp
@@ -167,9 +167,9 @@ Valores com cara de °C: q0.05 / mediana / q0.95 = 35.9 / 36.6 / 37.7. Entre a f
 | clip_to_valid_low | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00% |
 | valid | 17,061 | 136,526 | 223,676 | 28,272 | 1,066 | 179 | 406,780 | 100.00% |
 | clip_to_valid_high | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00% |
-| above_outlier_high (NaN) | <11 | <11 | <11 | 0 | 0 | 0 | 16 | 0.00% |
-| clínica: abaixo de 50 | 20 | 61 | 100 | <11 | 0 | 0 | 190 | 0.05% |
-| clínica: acima de 250 | <11 | 37 | 25 | 0 | 0 | 0 | 71 | 0.02% |
+| above_outlier_high (NaN) | <11 | <11 | <11 | 0 | 0 | 0 | — | — |
+| clínica: abaixo de 50 | 20 | 61 | 100 | <11 | 0 | 0 | — | — |
+| clínica: acima de 250 | <11 | 37 | 25 | 0 | 0 | 0 | — | — |
 | valor exatamente 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00% |
 
 ### dbp
@@ -185,15 +185,15 @@ Valores com cara de °C: q0.05 / mediana / q0.95 = 35.9 / 36.6 / 37.7. Entre a f
 | valid | 16,890 | 136,153 | 223,110 | 28,206 | 1,063 | 179 | 405,601 | 99.90% |
 | clip_to_valid_high | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00% |
 | above_outlier_high (NaN) | 18 | 148 | 203 | 26 | 0 | 0 | 395 | 0.10% |
-| clínica: abaixo de 20 | 17 | 55 | 68 | <11 | 0 | <11 | 152 | 0.04% |
-| clínica: acima de 150 | 40 | 237 | 280 | 32 | 0 | <11 | 590 | 0.15% |
-| valor exatamente 0 | <11 | <11 | <11 | 0 | 0 | 0 | 13 | 0.00% |
+| clínica: abaixo de 20 | 17 | 55 | 68 | <11 | 0 | <11 | — | — |
+| clínica: acima de 150 | 40 | 237 | 280 | 32 | 0 | <11 | — | — |
+| valor exatamente 0 | <11 | <11 | <11 | 0 | 0 | 0 | — | — |
 
 ### Pressão: diastólica ≥ sistólica
 
 | caso | acuity 1 | acuity 2 | acuity 3 | acuity 4 | acuity 5 | acuity ausente | total | % com ambas presentes |
 |---|---|---|---|---|---|---|---|---|
-| dbp ≥ sbp | 33 | 218 | 288 | 33 | 0 | <11 | 573 | 0.14% |
+| dbp ≥ sbp | 33 | 218 | 288 | 33 | 0 | <11 | — | — |
 
 ## 7. `pain` (texto livre desde a v2.0)
 
@@ -202,20 +202,20 @@ Classificação automática de cada valor bruto (os textos originais são preser
 | tipo (parser) | acuity 1 | acuity 2 | acuity 3 | acuity 4 | acuity 5 | acuity ausente | total | % |
 |---|---|---|---|---|---|---|---|---|
 | numeric | 14,035 | 127,152 | 215,411 | 27,881 | 1,070 | 175 | 385,724 | 90.74% |
-| range | 27 | 257 | 679 | 49 | 0 | <11 | 1,014 | 0.24% |
-| fraction | 0 | <11 | 15 | 0 | 0 | 0 | 21 | 0.00% |
+| range | 27 | 257 | 679 | 49 | 0 | <11 | — | — |
+| fraction | 0 | <11 | 15 | 0 | 0 | 0 | — | — |
 | out_of_range | 1,738 | 4,613 | 4,588 | 243 | 11 | 12 | 11,205 | 2.64% |
 | missing | 3,168 | 1,521 | 1,291 | 157 | 15 | 6,744 | 12,896 | 3.03% |
-| unable | 3,192 | 4,442 | 2,121 | 60 | <11 | 49 | 9,868 | 2.32% |
-| text_other | 1,859 | 1,420 | 961 | 114 | 0 | <11 | 4,359 | 1.03% |
+| unable | 3,192 | 4,442 | 2,121 | 60 | <11 | 49 | — | — |
+| text_other | 1,859 | 1,420 | 961 | 114 | 0 | <11 | — | — |
 
 | status (feature do modelo) | acuity 1 | acuity 2 | acuity 3 | acuity 4 | acuity 5 | acuity ausente | total | % |
 |---|---|---|---|---|---|---|---|---|
 | numeric | 14,062 | 127,415 | 216,105 | 27,930 | 1,070 | 177 | 386,759 | 90.98% |
 | missing | 3,168 | 1,521 | 1,291 | 157 | 15 | 6,744 | 12,896 | 3.03% |
-| unable | 3,192 | 4,442 | 2,121 | 60 | <11 | 49 | 9,868 | 2.32% |
+| unable | 3,192 | 4,442 | 2,121 | 60 | <11 | 49 | — | — |
 | out_of_range | 1,738 | 4,613 | 4,588 | 243 | 11 | 12 | 11,205 | 2.64% |
-| other | 1,859 | 1,420 | 961 | 114 | 0 | <11 | 4,359 | 1.03% |
+| other | 1,859 | 1,420 | 961 | 114 | 0 | <11 | — | — |
 
 Valores numéricos inteiros 0–10:
 
