@@ -14,7 +14,7 @@ cleaning:
   temperature_unit: F
   # Values inside this raw range are interpreted as entries typed in Celsius.
   celsius_like_range: [25.0, 45.0]
-  celsius_like_action: convert      # convert (C -> F) | nan | keep   [decided after the audit]
+  celsius_like_action: convert      # convert (C -> F) | nan | keep   [F1: 392 values, median 36.6 -> Celsius entries]
 
   # outside [outlier_low, outlier_high] -> NaN ; between an outlier bound and the valid
   # bound -> clipped to the valid bound (Xie et al. 2022).
@@ -26,8 +26,8 @@ cleaning:
     sbp:         {outlier_low: 0, valid_low: 0, valid_high: 375, outlier_high: 375}
     dbp:         {outlier_low: 0, valid_low: 0, valid_high: 375, outlier_high: 375}
 
-  zero_to_nan: []                   # e.g. [heartrate, resprate]   [decided after the audit]
-  dbp_ge_sbp_action: none           # none | nan_both              [decided after the audit]
+  zero_to_nan: [heartrate, resprate, o2sat, sbp, dbp]   # [F1] physiologically impossible at triage (< 0.01%)
+  dbp_ge_sbp_action: nan_both       # [F1] diastolic >= systolic is impossible: 573 stays (0.14%) -> both NaN
 
   # AUDIT ONLY (never applied): tighter clinical plausibility bands used to inspect the data.
   clinical_reference:
@@ -43,27 +43,33 @@ cleaning:
     max: 10
     range_policy: mean              # "5-6" -> 5.5 (kind = range, status = numeric)
     # Matched (case-insensitive, regex search) on the normalized string; refined after the audit.
-    unable_patterns:
-      - "unable"
-      - "unabl"
-      - "\\buta\\b"
-      - "\\bu/?a\\b"
-      - "unrespons"
-      - "intubat"
-      - "sedat"
-      - "non-?verbal"
-      - "aphasi"
-      - "unconscious"
-    # parser kind -> model feature status
+    unable_patterns:                # [F1] built from the audit's frequent strings (n >= 11)
+      - 'unable'
+      - 'unabl'
+      - 'uanble'
+      - '\buta\b'
+      - '^u$'
+      - '\bu/?a\b'
+      - 'unrespons'
+      - 'intubat'
+      - '\bett\b'
+      - 'sedat'
+      - 'non-?verbal'
+      - 'aphasi'
+      - 'unconscious'
+      - 'asleep'
+      - 'sleeping'
+    # parser kind -> model feature status. "13" alone is 10,921 stays (vs 69 for "12"): a system
+    # code, not a pain score, so numbers outside [0, 10] get their own category.
     status_map:
       numeric: numeric
       range: numeric
       fraction: numeric
       missing: missing
       unable: unable
-      out_of_range: other
+      out_of_range: out_of_range
       text_other: other
-    status_categories: [numeric, missing, unable, other]
+    status_categories: [numeric, missing, unable, out_of_range, other]
 
   audit:
     top_pain_strings: 60

@@ -20,13 +20,13 @@ models:
 
   # Parameters that are fixed (not searched).
   fixed:
-    logreg: {max_iter: 3000}
+    logreg: {solver: saga, max_iter: 2000, tol: 1.0e-4}
     gnb: {}
     knn: {}
     dtree: {}
     rf: {}
     svm_rbf: {cache_size: 2000}
-    xgb: {tree_method: hist, objective: "multi:softprob", eval_metric: mlogloss}
+    xgb: {tree_method: hist, objective: "multi:softprob", eval_metric: mlogloss, verbosity: 0}
     mlp: {early_stopping: true, validation_fraction: 0.1, n_iter_no_change: 10, max_iter: 300}
     hgb: {}
     extratrees: {}
@@ -36,9 +36,11 @@ models:
 
   # Random-search spaces. Types: loguniform, uniform, intuniform, intloguniform, choice.
   spaces:
-    logreg:
+    logreg:                       # elastic net (sklearn >= 1.8: l1_ratio replaces penalty)
       C: {type: loguniform, low: 1.0e-4, high: 100.0}
-    gnb:
+      l1_ratio: {type: uniform, low: 0.0, high: 1.0}
+      fit_intercept: {type: choice, values: [true]}
+    gnb:                          # GaussianNB has a single hyper-parameter
       var_smoothing: {type: loguniform, low: 1.0e-12, high: 1.0e-2}
     knn:
       n_neighbors: {type: intloguniform, low: 5, high: 300}
@@ -47,13 +49,18 @@ models:
     dtree:
       max_depth: {type: choice, values: [3, 5, 8, 12, 16, 24, null]}
       min_samples_leaf: {type: intloguniform, low: 1, high: 2000}
-      criterion: {type: choice, values: [gini, entropy]}
+      min_samples_split: {type: intloguniform, low: 2, high: 2000}
+      criterion: {type: choice, values: [gini, entropy, log_loss]}
+      max_features: {type: choice, values: [null, sqrt, 0.5]}
     rf:
       n_estimators: {type: choice, values: [200, 400]}
       max_depth: {type: choice, values: [8, 12, 16, 24, null]}
       min_samples_leaf: {type: intloguniform, low: 1, high: 500}
+      min_samples_split: {type: intloguniform, low: 2, high: 500}
       max_features: {type: choice, values: [sqrt, 0.5, 1.0]}
-    svm_rbf:
+      criterion: {type: choice, values: [gini, entropy]}
+      max_samples: {type: choice, values: [0.5, 0.8, null]}
+    svm_rbf:                      # the RBF kernel is fully described by C and gamma
       C: {type: loguniform, low: 1.0e-2, high: 1.0e3}
       gamma: {type: loguniform, low: 1.0e-4, high: 10.0}
     xgb:
@@ -63,24 +70,31 @@ models:
       subsample: {type: uniform, low: 0.5, high: 1.0}
       colsample_bytree: {type: uniform, low: 0.5, high: 1.0}
       min_child_weight: {type: loguniform, low: 1.0, high: 100.0}
+      gamma: {type: loguniform, low: 1.0e-4, high: 5.0}
       reg_lambda: {type: loguniform, low: 1.0e-3, high: 10.0}
+      reg_alpha: {type: loguniform, low: 1.0e-4, high: 10.0}
     mlp:
-      hidden_layer_sizes: {type: choice, values: [[32], [64], [128], [64, 32], [128, 64]]}
+      hidden_layer_sizes: {type: choice, values: [[32], [64], [128], [64, 32], [128, 64], [128, 64, 32]]}
+      activation: {type: choice, values: [relu, tanh]}
       alpha: {type: loguniform, low: 1.0e-6, high: 1.0e-2}
       learning_rate_init: {type: loguniform, low: 1.0e-4, high: 1.0e-2}
       batch_size: {type: choice, values: [256, 512, 1024]}
     hgb:
       learning_rate: {type: loguniform, low: 0.01, high: 0.3}
+      max_iter: {type: choice, values: [200, 400]}
       max_leaf_nodes: {type: intloguniform, low: 8, high: 128}
+      max_depth: {type: choice, values: [null, 4, 8, 12]}
       min_samples_leaf: {type: intloguniform, low: 10, high: 500}
       l2_regularization: {type: loguniform, low: 1.0e-6, high: 10.0}
-      max_iter: {type: choice, values: [200, 400]}
+      max_features: {type: uniform, low: 0.5, high: 1.0}
     extratrees:
       n_estimators: {type: choice, values: [200, 400]}
       max_depth: {type: choice, values: [8, 12, 16, 24, null]}
       min_samples_leaf: {type: intloguniform, low: 1, high: 500}
+      min_samples_split: {type: intloguniform, low: 2, high: 500}
       max_features: {type: choice, values: [sqrt, 0.5, 1.0]}
-    ordinal_logit:
+      criterion: {type: choice, values: [gini, entropy]}
+    ordinal_logit:                # proportional odds; only the L2 strength is free
       alpha: {type: loguniform, low: 1.0e-6, high: 1.0e-1}
     dummy_prior: {}
     dummy_stratified: {}
