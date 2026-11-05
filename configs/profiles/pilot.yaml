@@ -1,6 +1,6 @@
 # Cost pilot on the server with FULL data: 1 seed, 3 configurations per model.
 # Its timings size the main campaign (frozen in a commit BEFORE the main launch).
-campaign: {tag: pilot}
+campaign: {tag: pilot, require_clean_git: false}
 split: {seeds: [1], priority_seeds: 1}
 hpo: {n_configs: 3}
 evaluation:

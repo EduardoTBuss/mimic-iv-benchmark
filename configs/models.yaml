@@ -24,13 +24,13 @@ models:
     gnb: {}
     knn: {}
     dtree: {}
-    rf: {}
+    rf: {n_estimators: 200}            # 200 vs 400 trees: negligible gain, ~half the RAM (review 05/11)
     svm_rbf: {cache_size: 2000}
     xgb: {tree_method: hist, objective: "multi:softprob", eval_metric: mlogloss, verbosity: 0}
     mlp: {early_stopping: true, validation_fraction: 0.1, n_iter_no_change: 10, max_iter: 300}
-    hgb: {}
-    extratrees: {}
-    ordinal_logit: {max_iter: 500}
+    hgb: {early_stopping: false}       # explicit: 'auto' silently enables it for n > 10k
+    extratrees: {n_estimators: 200}
+    ordinal_logit: {max_iter: 500, classes: [0, 1, 2, 3, 4]}   # labels are encoded 0..4; a missing class is an error
     dummy_prior: {strategy: prior}
     dummy_stratified: {strategy: stratified}
 
@@ -41,7 +41,7 @@ models:
       l1_ratio: {type: uniform, low: 0.0, high: 1.0}
       fit_intercept: {type: choice, values: [true]}
     gnb:                          # GaussianNB has a single hyper-parameter
-      var_smoothing: {type: loguniform, low: 1.0e-12, high: 1.0e-2}
+      var_smoothing: {type: loguniform, low: 1.0e-9, high: 1.0}   # sklearn's usual logspace(0, -9); binary indicators need large smoothing
     knn:
       n_neighbors: {type: intloguniform, low: 5, high: 300}
       weights: {type: choice, values: [uniform, distance]}
@@ -53,7 +53,6 @@ models:
       criterion: {type: choice, values: [gini, entropy, log_loss]}
       max_features: {type: choice, values: [null, sqrt, 0.5]}
     rf:
-      n_estimators: {type: choice, values: [200, 400]}
       max_depth: {type: choice, values: [8, 12, 16, 24, null]}
       min_samples_leaf: {type: intloguniform, low: 1, high: 500}
       min_samples_split: {type: intloguniform, low: 2, high: 500}
@@ -61,8 +60,8 @@ models:
       criterion: {type: choice, values: [gini, entropy]}
       max_samples: {type: choice, values: [0.5, 0.8, null]}
     svm_rbf:                      # the RBF kernel is fully described by C and gamma
-      C: {type: loguniform, low: 1.0e-2, high: 1.0e3}
-      gamma: {type: loguniform, low: 1.0e-4, high: 10.0}
+      C: {type: loguniform, low: 0.01, high: 100.0}       # C > 100 costs ~20x more fit time (review 05/11)
+      gamma: {type: loguniform, low: 0.001, high: 1.0}    # ~18 standardized cols: gamma_scale ~ 0.07; 10 interpolates
     xgb:
       n_estimators: {type: intuniform, low: 100, high: 800}
       max_depth: {type: intuniform, low: 2, high: 10}
@@ -88,7 +87,6 @@ models:
       l2_regularization: {type: loguniform, low: 1.0e-6, high: 10.0}
       max_features: {type: uniform, low: 0.5, high: 1.0}
     extratrees:
-      n_estimators: {type: choice, values: [200, 400]}
       max_depth: {type: choice, values: [8, 12, 16, 24, null]}
       min_samples_leaf: {type: intloguniform, low: 1, high: 500}
       min_samples_split: {type: intloguniform, low: 2, high: 500}

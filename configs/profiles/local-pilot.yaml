@@ -1,6 +1,6 @@
 # Quick end-to-end run on REAL data on the notebook (8 GB RAM): 5% of patients, 1 seed,
 # 2 configurations. Validates the pipeline; its numbers are NOT results.
-campaign: {tag: local-pilot}
+campaign: {tag: local-pilot, require_clean_git: false}
 prepare: {sample_fraction: 0.05}
 split: {seeds: [1], priority_seeds: 1}
 hpo: {n_configs: 2}

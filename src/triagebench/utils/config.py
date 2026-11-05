@@ -187,6 +187,9 @@ def validate_config(cfg: dict) -> None:
     if len(primaries) != 1:
         raise ConfigError(f"exactly one variant must have role: primary (got {primaries})")
     for name, v in variants.items():
+        bad_strat = [s for s in v.get("strategies", []) if s not in cfg["imbalance"]["strategies"]]
+        if bad_strat:
+            raise ConfigError(f"variant {name}: strategies {bad_strat} not in imbalance.strategies")
         if v.get("role") not in {"primary", "sensitivity"}:
             raise ConfigError(f"variant {name}: role must be primary or sensitivity")
         for key in ("numeric_features", "categorical_features", "exclude_non_numeric_pain"):
@@ -204,6 +207,13 @@ def validate_config(cfg: dict) -> None:
     no_space = [m for m in models if m not in spaces]
     if no_space:
         raise ConfigError(f"models without a search space entry (use {{}} for none): {no_space}")
+    for model, space in spaces.items():
+        for name, spec in (space or {}).items():
+            if spec.get("type") != "choice":
+                for bound in ("low", "high"):
+                    if not isinstance(spec.get(bound), (int, float)) or isinstance(spec.get(bound), bool):
+                        raise ConfigError(f"models.spaces.{model}.{name}.{bound} must be a number, got {spec.get(bound)!r} "
+                                          "(PyYAML reads 1.0e3 as text: write 1000.0 or 1.0e+3)")
     groups = cfg["models"].get("groups", {})
     outside = set(groups.get("simple", [])) | set(groups.get("complex", []))
     if not outside <= set(cfg["models"].get("primary", [])):

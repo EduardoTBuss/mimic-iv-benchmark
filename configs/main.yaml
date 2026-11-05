@@ -13,6 +13,7 @@ include:
 
 campaign:
   tag: main
+  require_clean_git: true   # the main campaign only runs from a committed tree
 
 paths:
   outputs: outputs        # gitignored; per-patient artifacts live in outputs/**/private/
@@ -59,6 +60,18 @@ variants:
     exclude_non_numeric_pain: true
     numeric_features: [temperature, heartrate, resprate, o2sat, sbp, dbp, pain_value]
     categorical_features: []
+  C_values_only:
+    role: sensitivity
+    description: >-
+      Same stays as A, but the model only sees measured values (6 vitals + pain_value): no
+      missing-value indicators and no pain_status. Measures how much performance comes from
+      documentation patterns (missing vitals are a strong proxy of acuity 1). Added 05/11 after
+      the theory review, before any result. Strategy none only.
+    exclude_non_numeric_pain: false
+    missing_indicators: false
+    numeric_features: [temperature, heartrate, resprate, o2sat, sbp, dbp, pain_value]
+    categorical_features: []
+    strategies: [none]
 
 split:
   seeds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
@@ -95,3 +108,4 @@ resources:                   # runtime only (not hashed)
   max_attempts: 3
   poll_seconds: 10
   launch_interval_seconds: 5
+  max_concurrent_per_model: {rf: 2, extratrees: 2}   # fully grown forests take GBs of RAM each

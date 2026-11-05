@@ -1,5 +1,5 @@
 # End-to-end check on SYNTHETIC data (CI, server pre-flight). Never touches MIMIC.
-campaign: {tag: smoke}
+campaign: {tag: smoke, require_clean_git: false}
 split: {seeds: [1, 2], priority_seeds: 1}
 hpo: {n_configs: 2}
 models:
