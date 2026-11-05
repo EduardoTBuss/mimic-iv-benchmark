@@ -8,7 +8,7 @@ cd "$(dirname "$0")/.."
 PROFILE="${1:-}"
 SESSION="${SESSION:-triagebench}"
 PY="${PY:-.venv/bin/python}"
-LOGDIR="${LOGDIR:-launch-logs}"
+if [ -d ../launch-logs ]; then LOGDIR="${LOGDIR:-../launch-logs}"; else LOGDIR="${LOGDIR:-launch-logs}"; fi   # server layout: ~/mimic-iv-benchmark/launch-logs
 mkdir -p "$LOGDIR"
 LOG="$LOGDIR/run-all-$(date +%Y%m%d-%H%M%S).log"
 PROFILE_ARG=""
