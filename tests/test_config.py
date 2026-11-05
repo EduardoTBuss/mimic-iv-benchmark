@@ -35,4 +35,6 @@ def test_target_as_feature_is_rejected():
 def test_profiles_can_be_stacked():
     cfg = load_config(REPO / "configs" / "main.yaml", profile="qflex,pilot")
     assert cfg["campaign"]["tag"] == "pilot"
-    assert cfg["resources"]["max_workers"] == 8
+    import yaml
+    qflex = yaml.safe_load((REPO / "configs" / "profiles" / "qflex.yaml").read_text(encoding="utf-8"))
+    assert cfg["resources"]["max_workers"] == qflex["resources"]["max_workers"]
