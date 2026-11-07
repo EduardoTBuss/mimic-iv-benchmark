@@ -4,7 +4,7 @@
 \definecolor{methodblue}{HTML}{234B70}
 \definecolor{methodteal}{HTML}{287A78}
 \definecolor{methodorange}{HTML}{AD593A}
-\newcommand{\pending}[1]{\textbf{[Pending: #1]}}
+\newcommand{\pending}[1]{\textit{[Evidence pending: #1]}}
 \renewcommand{\shortauthors}{Anonymous submission}
 \begin{document}
 \title{Predicting Recorded Emergency Triage Acuity: A Reproducible MIMIC-IV-ED Benchmark}
@@ -17,9 +17,8 @@ validation and test partitions, and validation-based hyperparameter selection.
 Macro-F1 is the primary metric; class-specific performance, ordinal errors and
 computational cost provide complementary views. Registered sensitivity analyses
 examine pain representation and explicit missingness indicators.
-\pending{Insert authorized effect estimates, uncertainty and hypothesis decisions
-after independent statistical review.}
-\pending{Add the conclusion supported by those results.}
+\pending{Empirical estimates, uncertainty and conclusions require authorized
+results and independent statistical review.}
 The scope is retrospective prediction of recorded labels; the study does not
 evaluate clinical benefit or deployment safety.
 \end{abstract}
@@ -42,28 +41,29 @@ models~\cite{scc2023prediagnosis,li2025hybrid}.
 The motivation here is a controlled comparison under an explicit protocol,
 rather than a claim to introduce machine learning for this task.
 
-Our question is: \emph{under a fixed search budget and patient-separated
-evaluation, do the designated complex models consistently outperform the
-designated simple models in predicting recorded acuity?} A second question asks
-whether class weighting or random oversampling improves both minority-class
-recall and overall class-balanced performance.
+The primary objective is to determine whether the validation-selected complex
+model consistently exceeds the validation-selected simple model in test
+Macro-F1 under a fixed search budget and patient-separated evaluation (H1).
+The prespecified rebalancing contrasts ask whether class weighting or random
+oversampling improves urgent-class recall together with overall
+class-balanced performance (H2). Secondary objectives describe ordinal errors,
+reliance on input variables, representation sensitivity and computational cost.
 
 The intended contribution combines reproducible evaluation, ordinal errors,
 uncertainty across patient splits, preprocessing sensitivities and computational
 cost. Empirical results remain placeholders pending authorization and review.
 
-The central proposition is that a useful benchmark should explain \emph{what
-an improvement buys}. A higher aggregate score may come with worse recall
-for an urgent class, more distant ordinal disagreements, or a large increase
-in training cost. Conversely, a smaller model can be attractive without
-winning every metric. The study therefore keeps a single confirmatory
-criterion while placing it alongside complementary descriptive evidence.
-These views explain a comparison; they do not create additional criteria for
-declaring H1 successful after observing results.
+The central proposition is that aggregate performance alone does not explain
+the value of additional model complexity. A higher score may coexist with
+worse urgent-class recall, more distant ordinal disagreements or greater
+computational cost. The benchmark therefore distinguishes the primary H1
+superiority rule, the separately specified H2 rebalancing tests, and
+complementary descriptive analyses. These views explain the comparison;
+they do not provide alternative criteria for declaring H1 successful.
 
 The scope is deliberately narrow: one versioned data source, seven structured
 inputs, eight primary algorithms and a shared patient-level evaluation
-design. Excluding free text keeps differences in text representation and
+design. Excluding chief-complaint text keeps differences in text representation and
 language-model pretraining outside the main comparison. The intended output
 is a reusable reference protocol for later work on ordinal or interpretable
 models, with clear boundaries on what its retrospective labels can establish.
@@ -155,7 +155,7 @@ as missing or clip them to prespecified bounds, following the two-tier approach
 used by Xie et al.~\cite{xie2022benchmark}. Cleaning a predictor does not itself
 delete a visit. A prespecified temperature rule converts entries in a
 Celsius-like range to Fahrenheit. These rules are fixed in configuration.
-\pending{Insert the authorized cohort flow, exclusions and masked class counts.}
+\pending{Cohort flow, exclusions and disclosure-checked class counts.}
 
 The seven inputs describe a deliberately restricted information set. They
 do not capture the entire triage assessment: the recorded label can reflect
@@ -313,7 +313,7 @@ $\Delta_s=F_{1,\mathrm{macro}}^{\mathrm{complex},s}
 -F_{1,\mathrm{macro}}^{\mathrm{simple},s}$ on test data.
 Consistent superiority requires $\Delta_s>0$ in every analyzed seed and a
 corrected 95\% confidence-interval lower bound above the registered practical
-margin $\delta=0.01$. Otherwise the decision is ``no consistent superiority'';
+margin $\delta=0.01$ (one percentage point). Otherwise the decision is ``no consistent superiority'';
 this does not establish equivalence.
 
 The seed is the unit of between-split inference. For $k$ paired differences,
@@ -329,9 +329,10 @@ create independent datasets. A patient-cluster bootstrap with 1,000 resamples
 provides separate within-seed test-sampling intervals. These intervals do not
 replace H1 or include retraining uncertainty.
 
-\textbf{H2: rebalancing.} For each primary model and applicable strategy,
-paired differences against no rebalancing are assessed for class-1 recall,
-Macro-F1 and balanced accuracy. Support requires positive mean differences
+\textbf{H2: rebalancing.} On variant A, each primary model and applicable
+strategy is compared with no rebalancing using paired test-set differences
+in class-1 recall, Macro-F1 and balanced accuracy. The same corrected
+resampled $t$ procedure supplies two-sided $p$ values. Support requires positive mean differences
 and Holm-adjusted $p<0.05$ for all three measures. Holm correction is applied
 across primary models within each strategy--metric family (six families);
 there is no single global multiplicity claim across them.
@@ -351,7 +352,7 @@ registered contrast on one dataset.
 
 \subsection{Interpretability}
 Grouped permutation importance examines one model from each primary group,
-selected by mean validation Macro-F1 without rebalancing. A raw vital sign
+selected by mean validation Macro-F1 on A without rebalancing. A raw vital sign
 is permuted together with the missingness information generated from it;
 pain value and pain status are permuted together. This preserves the
 connection between representations of the same input. Importance is the
@@ -380,24 +381,27 @@ uses the validation visits.
 Training and inference costs are reported separately. Concurrent campaign
 times are operational measurements, not controlled cost comparisons.
 Inference time is expressed in milliseconds per 1,000 visits.
-\pending{Verify common hardware, software versions and measurement conditions
-from authorized provenance.}
+\pending{Verified hardware, software versions and measurement conditions.}
 
 The implementation fixes configuration and environment versions and includes
 synthetic tests for patient separation, training-only preprocessing, model
-selection and reporting. \pending{Insert an approved anonymous artifact-access
-statement.} Restricted data, trained models and visit-level predictions are
+selection and reporting. \pending{Anonymous artifact-access statement.}
+Restricted data, trained models and visit-level predictions are
 excluded from public artifacts. No campaign metrics or derived figures have
 been incorporated into this draft.
 
 \section{Results}
-\pending{Approved derived artifacts and independent review are required.
-No numerical result has been filled from the campaign.}
+\textbf{Empirical evidence is pending.} This draft contains no campaign
+estimates. Table~\ref{tab:results} identifies the registered outputs still
+needed for a complete results section. The three preceding figures explain
+the design and metric definitions; they are not experimental findings.
 
 \subsection{Primary contrast and balancing}
-\pending{Report the final seed prefix, validation-selected models, paired H1
-differences, corrected confidence interval, effect size and registered
-decision. Distinguish principal analysis from any earlier preview.}
+The H1 result requires the eligible seed prefix, validation-selected models,
+paired Macro-F1 differences, corrected confidence interval and registered
+decision. H2 requires the corresponding test-set differences, effective pair
+counts and adjusted $p$ values. A principal report must be distinguished
+from a technical preview before the registered cutoff.
 
 \begin{table}[t]
 \caption{Reserved result summary. ``Pending'' denotes unavailable evidence.}
@@ -415,24 +419,21 @@ Computational cost & Pending: controlled fit and inference time \\
 \end{tabular}
 \end{table}
 
-\pending{Add a compact primary-model table with Macro-F1, balanced accuracy,
-class-1 recall and ordinal metrics. Report HPO failures and convergence
-warnings separately from task completion.}
+\pending{Primary-model estimates and H1/H2 decisions.}
 
 \subsection{Ordinal errors, sensitivity and cost}
-\pending{Report error distances, class-specific precision and recall trade-offs,
-common-subset A/B differences and paired A/C differences. Include complete
-versus incomplete predictor strata. Interpret permutation importance
-descriptively, without causal claims.}
-\pending{Include at most one compact figure if it adds information beyond the
-tables. Counts and percentages require approved disclosure checks.}
+The descriptive results require class-specific precision and recall, ordinal
+distances, common-test A/B and paired A/C differences, complete/incomplete
+predictor strata, grouped permutation importance and controlled timings.
+Failed search configurations and convergence warnings must be reported
+separately from completed tasks. These outputs remain unavailable here;
+no direction or size of an empirical difference is inferred from the design.
 
 \section{Discussion}
-The final interpretation must follow the registered contrasts, uncertainty and
-operating constraints. A higher recall for the most urgent recorded class
-can coexist with lower precision; both belong in the discussion. Ordinal
-distance provides information that overall agreement alone omits.
-\pending{Explain only trade-offs supported by the authorized results.}
+The following discussion explains how the registered comparisons should be
+interpreted. It identifies design-dependent limitations and possible
+trade-offs, not observed outcomes. Empirical interpretations must be added
+only after the registered estimates and uncertainty have been validated.
 
 \subsection{Interpreting the complexity comparison}
 The original benchmark idea is to ask whether added model complexity earns
@@ -544,8 +545,10 @@ and apply disclosure rules to every published table and figure.
 \section{Conclusion and Future Work}
 This manuscript defines a controlled benchmark for predicting recorded
 five-level emergency triage acuity using structured measurements.
-\pending{Replace this sentence with the finding justified by H1/H2 and its
-effect size after authorization and independent review.}
+Its intended contribution is a common evaluation framework connecting
+class-balanced performance, ordinal disagreement, input representation,
+interpretability and computational cost.
+\pending{Empirical conclusion for H1/H2 and the corresponding effect sizes.}
 Future work could test transport across hospitals and time periods and
 assess clinical utility with prospective validation. These are future
 directions, not evaluations performed in this study.
@@ -555,10 +558,10 @@ Omitted for anonymous review.
 
 \section*{Declaration of Generative AI Use}
 OpenAI Codex assisted with manuscript drafting, language editing, public-source
-literature search and code review. No restricted MIMIC records, patient-level
+literature search, code review and authoring conceptual diagrams.
+No restricted MIMIC records, patient-level
 predictions or campaign result artifacts were supplied to this drafting
-workflow. \pending{Before submission, authors must verify all statements and
-references and update this declaration to cover the complete workflow.}
+workflow. Responsibility for the submitted version remains with the authors.
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{references}

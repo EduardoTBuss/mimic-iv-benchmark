@@ -74,3 +74,15 @@ Replacing placeholders with approved results will require another six-page,
 source, disclosure, anonymity and visual check. Final independent review of this
 expanded manuscript also remains pending; the earlier three-page/code acceptance
 must not be automatically extended to this revision.
+
+## Later disposition: final editorial review completed
+
+The interrupted independent review was subsequently resumed. After the coordinator
+clarified the primary objective and H1/H2 roles, made H2's variant/test explicit,
+and simplified editorial evidence markers, the reviewer independently checked all
+six final pages and issued ACCEPT for editorial/method-consistency scope. The
+completed review and artifact hashes are in
+`docs/reviews/2026-11-07-final-editorial-independent-review.md`. This closes the
+editorial-review condition above, while preserving all empirical/data/principal
+provenance gates. Final PDF SHA256:
+`27ff40239c552fdef777d08d752ea72e9af0b67b2dc96d06b526212852da14a6`.

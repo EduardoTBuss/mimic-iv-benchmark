@@ -120,19 +120,21 @@ The local official-template build succeeds using `paper/build.ps1`. The current
 2026-11-07 draft is six letter-size pages, with nine resolved references and visible empirical
 placeholders. PDF author metadata is empty and no personal name, local repository
 path, host identifier or identifying project link appears in the extracted text.
-All six rendered pages were visually inspected by the coordinator. No clipping,
-overlapping content, unresolved citations or missing glyphs were found. The final
-LaTeX log has no overfull boxes or missing figure descriptions. Earlier independent
-acceptance applied to the three-page draft and code; the expanded manuscript's
-additional peer review was partial because the agent hit a usage limit. Its two
-actionable wording findings were applied and checked against source. See
-`docs/reviews/2026-11-07-six-page-manuscript-review.md` for the precise review scope.
+All six rendered pages were visually inspected by the coordinator and, after the
+final editorial revision, by an independent artifact-consistency reviewer.
+No clipping, overlapping content, unresolved citations or missing glyphs were
+found. The final LaTeX log has no overfull boxes or missing figure descriptions.
+The earlier interrupted peer review was resumed and completed. Its final decision
+is ACCEPT for editorial clarity, method consistency and authored-draft presentation
+only; it does not certify empirical results or submission readiness. See
+`docs/reviews/2026-11-07-final-editorial-independent-review.md`.
 
 PDF: `output/pdf/cotb2027-mimic-iv-ed-draft.pdf` (ignored by Git).
-SHA256: `2e688ac64127b69d36a2d5a355b8ff59496c1e086039cc4f6fee0b0450ff886e`.
+SHA256: `27ff40239c552fdef777d08d752ea72e9af0b67b2dc96d06b526212852da14a6`.
 The source in `paper/main.tex` is versioned; the PDF is rebuilt locally.
 A byte-identical copy was saved to
-`C:/Users/eduar/Downloads/COTB2027_MIMIC-IV-ED_6pages_draft.pdf` for user review.
+`C:/Users/eduar/Downloads/COTB2027_MIMIC-IV-ED_6pages_reviewed_draft.pdf` for user review.
+The earlier Downloads draft is preserved as a separate version.
 
 The expanded framing was checked against the original proposal at
 `C:/Users/eduar/Brain/raw/contexto/ideia-cotb-paper-b-mimic-iv-ed-2026-11-04.md`:
@@ -149,6 +151,31 @@ class; the manuscript is English and its fonts/layout render correctly.
 
 This validation concerns document presentation and source support, not the
 accuracy of any experiment. It is not a submission-ready full paper.
+
+## Final editorial pass (2026-11-07)
+
+The user requested continued autonomous refinement before final Brain integration.
+The completed passes covered objective/contribution clarity, plan/code/figure
+consistency, reader-oriented prose, citations/anonymity, and final six-page visual
+proofreading. The opening now distinguishes primary H1 from separate confirmatory
+H2 contrasts; H2 explicitly uses A, paired test differences and two-sided corrected
+tests. Chief-complaint text is distinguished from parsed pain strings. Repetitive
+imperative author instructions were replaced with concise evidence markers and
+ordinary explanatory prose. The AI declaration now includes diagram authoring and
+retains author responsibility without asserting completed author verification.
+
+All bounded editorial findings are closed. The independent final review records
+the claim traceability and final hashes. Code, tests, scientific configurations,
+metric definitions and the preregistration remain unchanged; no new campaign or
+real result analysis was run. The earlier 329-test pass is historical evidence
+for the unchanged code, not a new execution claim.
+
+A public-source eligibility check was also completed without data/account access:
+`docs/data_service_eligibility.md`. The exact service's eligibility and permitted
+derivative categories remain unestablished. The empirical paper still needs
+approved result evidence, immutable cutoff provenance, independent result review
+and final author approval. Continuing to rewrite prose cannot resolve these gates,
+and this editorial acceptance must not be presented as scientific completion.
 
 ## Final validation (2026-11-06)
 

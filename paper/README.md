@@ -10,6 +10,14 @@ idea. The figures explain the workflow, representations A/B/C and signed ordinal
 disagreement; none visualizes measured performance. Figure sources and provenance
 are in `figures/README.md`. This revision supersedes the earlier three-page draft.
 
+The final editorial pass has an independent ACCEPT for clarity, consistency with
+the unchanged method and six-page presentation; see
+`../docs/reviews/2026-11-07-final-editorial-independent-review.md`. It distinguishes
+H1/H2 roles and replaces repeated author instructions with concise evidence
+markers. This acceptance does not cover empirical results or submission readiness.
+The compiled, reviewed copy is saved separately in Downloads as
+`COTB2027_MIMIC-IV-ED_6pages_reviewed_draft.pdf`.
+
 ## Build locally
 
 From this directory:

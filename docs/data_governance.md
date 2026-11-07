@@ -24,6 +24,13 @@ do escopo enquanto a elegibilidade e os derivados permitidos não forem confirma
 
 ## Regra zero
 
+> Verificação de fontes públicas em 07/11/2026: a orientação do PhysioNet de
+> 24/09/2025 abrange dados MIMIC e derivados e não endossa fornecedores. Os
+> exemplos de plataformas da nota de 2023 abaixo são históricos e não comprovam
+> autorização atual. A elegibilidade desta sessão continua não estabelecida;
+> ver `docs/data_service_eligibility.md`. Nenhum dado/derivado foi usado para
+> realizar essa verificação.
+
 1. **Nenhum dado no git.** Nem linha, nem `subject_id`/`stay_id`, nem predição por estadia, nem
    linha excluída, nem modelo treinado. O repositório só tem código, configuração e relatórios
    **agregados** com máscara de células pequenas.
