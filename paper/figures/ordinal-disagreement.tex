@@ -1,0 +1,28 @@
+\begin{tikzpicture}[x=.62cm,y=.62cm,font=\sffamily\fontsize{8}{10}\selectfont]
+\foreach \true in {1,...,5}{
+  \foreach \pred in {1,...,5}{
+    \pgfmathtruncatemacro{\difference}{\pred-\true}
+    \pgfmathtruncatemacro{\shade}{12+abs(\difference)*11}
+    \ifnum\difference>0
+      \filldraw[fill=methodorange!\shade,draw=white,line width=.5pt] (\pred,-\true) rectangle ++(1,-1);
+      \node at (\pred+.5,-\true-.5) {$+\difference$};
+    \else
+      \ifnum\difference<0
+        \filldraw[fill=methodteal!\shade,draw=white,line width=.5pt] (\pred,-\true) rectangle ++(1,-1);
+      \else
+        \filldraw[fill=black!7,draw=white,line width=.5pt] (\pred,-\true) rectangle ++(1,-1);
+      \fi
+      \node at (\pred+.5,-\true-.5) {$\difference$};
+    \fi
+  }
+}
+\foreach \level in {1,...,5}{
+  \node at (\level+.5,-.55) {\level};
+  \node at (.55,-\level-.5) {\level};
+}
+\node at (3.5,.25) {\textbf{Predicted level} $\hat y$};
+\node[rotate=90] at (-.3,-3.5) {\textbf{Recorded level} $y$};
+\node[anchor=west,align=left,text width=2.5cm] at (6.5,-2) {\textcolor{methodorange}{\textbf{Positive $d$}}\\Less urgent\\than recorded\\(undertriage)};
+\node[anchor=west,align=left,text width=2.5cm] at (6.5,-4.7) {\textcolor{methodteal}{\textbf{Negative $d$}}\\More urgent\\than recorded\\(overtriage)};
+\node[align=center] at (4.5,-6.85) {1 = most urgent; 5 = least urgent\\$|d|=1$: adjacent; $|d|\geq2$: distant};
+\end{tikzpicture}

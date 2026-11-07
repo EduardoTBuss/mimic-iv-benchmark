@@ -1,0 +1,22 @@
+\begin{tikzpicture}[
+  card/.style={rounded corners=2pt,line width=.7pt,minimum height=2.35cm,
+    text width=4.7cm,align=left,inner sep=8pt,font=\sffamily\fontsize{8}{11}\selectfont}]
+\node[card,draw=methodblue,fill=methodblue!5] (a) at (0,0) {
+  \textcolor{methodblue}{\textbf{A \quad Primary representation}}\\[4pt]
+  Valid-acuity visits retained\\
+  Values + absence indicators\\
+  Pain value + encoded pain status\\
+  None / class weighting / oversampling};
+\node[card,draw=methodorange,fill=methodorange!5] (b) at (5.9,0) {
+  \textcolor{methodorange}{\textbf{B \quad Numeric-pain sensitivity}}\\[4pt]
+  Plain numeric pain in $[0,10]$ only\\
+  Same patient split assignments\\
+  Values + absence indicators\\
+  No encoded pain status};
+\node[card,draw=methodteal,fill=methodteal!5] (c) at (11.8,0) {
+  \textcolor{methodteal}{\textbf{C \quad Explicit-feature ablation}}\\[4pt]
+  Same visits and splits as A\\
+  Values + median imputation\\
+  No absence flags or pain status\\
+  No rebalancing};
+\end{tikzpicture}

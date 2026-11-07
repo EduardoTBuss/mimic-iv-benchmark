@@ -110,21 +110,36 @@ explicitly mentions it for the final version. Follow the stricter template here.
 | References, acknowledgments and AI disclosure | 0.8 |
 | Total ceiling | 6.0 |
 
-The current draft can be shorter; do not fill space with invented results.
+The 2026-11-07 revision uses six pages at the user's request. Its additional space
+develops the original scientific proposition, methodological interpretation and
+three conceptual figures. It does not fill space with invented results.
 
 ## Authored draft validation
 
-The local official-template build succeeds using `paper/build.ps1`. The draft is
-three letter-size pages, with nine resolved references and visible empirical
+The local official-template build succeeds using `paper/build.ps1`. The current
+2026-11-07 draft is six letter-size pages, with nine resolved references and visible empirical
 placeholders. PDF author metadata is empty and no personal name, local repository
 path, host identifier or identifying project link appears in the extracted text.
-All three rendered pages were visually inspected by the coordinator and the
-independent integration reviewer. No clipping, overlapping content, unresolved
-citations or missing glyphs were found. Final LaTeX log has no overfull boxes.
+All six rendered pages were visually inspected by the coordinator. No clipping,
+overlapping content, unresolved citations or missing glyphs were found. The final
+LaTeX log has no overfull boxes or missing figure descriptions. Earlier independent
+acceptance applied to the three-page draft and code; the expanded manuscript's
+additional peer review was partial because the agent hit a usage limit. Its two
+actionable wording findings were applied and checked against source. See
+`docs/reviews/2026-11-07-six-page-manuscript-review.md` for the precise review scope.
 
 PDF: `output/pdf/cotb2027-mimic-iv-ed-draft.pdf` (ignored by Git).
-SHA256: `9052f410e601effe7c945e17a5a29917eaee27d374e8cabc01c6e5deeb9eb076`.
+SHA256: `2e688ac64127b69d36a2d5a355b8ff59496c1e086039cc4f6fee0b0450ff886e`.
 The source in `paper/main.tex` is versioned; the PDF is rebuilt locally.
+A byte-identical copy was saved to
+`C:/Users/eduar/Downloads/COTB2027_MIMIC-IV-ED_6pages_draft.pdf` for user review.
+
+The expanded framing was checked against the original proposal at
+`C:/Users/eduar/Brain/raw/contexto/ideia-cotb-paper-b-mimic-iv-ed-2026-11-04.md`:
+controlled simple/complex comparison, imbalance, ordinal errors, variable
+importance and relative computational cost. Earlier exploratory suggestions in
+that proposal do not override the later fixed analysis plan. No new empirical
+analysis, hypothesis or decision criterion was added for the expansion.
 
 The local TinyTeX installation required missing template/font packages; the class
 and bibliography style were not edited. Poppler could not load its Windows DLLs

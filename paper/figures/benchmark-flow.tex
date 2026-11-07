@@ -1,0 +1,21 @@
+\begin{tikzpicture}[
+  box/.style={draw=methodblue!75,fill=methodblue!5,rounded corners=2pt,
+    line width=.6pt,text width=3.15cm,minimum height=1.4cm,align=center,
+    font=\sffamily\fontsize{8}{10}\selectfont,inner sep=5pt},
+  flow/.style={-{Stealth[length=2mm]},draw=methodblue,line width=.9pt}]
+\node[box] (inputs) at (0,0) {\textbf{Fixed information set}\\Six vital signs + pain\\Target: recorded acuity};
+\node[box] (split) at (4.15,0) {\textbf{Split by patient}\\70\% / 15\% / 15\%\\10 fixed seeds};
+\node[box] (train) at (8.3,0) {\textbf{Fit on training only}\\Impute / encode / scale\\Optional rebalancing};
+\node[box] (validation) at (12.45,0) {\textbf{Select on validation}\\20 candidate settings\\Primary score: Macro-F1};
+\node[box,fill=methodteal!6,draw=methodteal] (freeze) at (12.45,-2.25) {\textbf{Freeze and refit}\\Selected settings\\Training partition only};
+\node[box,fill=methodteal!6,draw=methodteal] (test) at (8.3,-2.25) {\textbf{Assess held-out test}\\No test-based selection\\Private predictions};
+\node[box,fill=methodteal!6,draw=methodteal] (metrics) at (4.15,-2.25) {\textbf{Evaluation views}\\Class-balanced / ordinal\\Cost and sensitivities};
+\node[box,fill=methodteal!6,draw=methodteal] (inference) at (0,-2.25) {\textbf{Compare paired seeds}\\H1 and H2 as registered\\Descriptives kept separate};
+\draw[flow] (inputs)--(split);
+\draw[flow] (split)--(train);
+\draw[flow] (train)--(validation);
+\draw[flow] (validation)--node[right,font=\sffamily\fontsize{7}{9}\selectfont]{lock settings}(freeze);
+\draw[flow] (freeze)--(test);
+\draw[flow] (test)--(metrics);
+\draw[flow] (metrics)--(inference);
+\end{tikzpicture}

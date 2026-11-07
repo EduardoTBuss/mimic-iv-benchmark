@@ -1,4 +1,9 @@
 \input{cotb2027-preamble}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc}
+\definecolor{methodblue}{HTML}{234B70}
+\definecolor{methodteal}{HTML}{287A78}
+\definecolor{methodorange}{HTML}{AD593A}
 \newcommand{\pending}[1]{\textbf{[Pending: #1]}}
 \renewcommand{\shortauthors}{Anonymous submission}
 \begin{document}
@@ -47,6 +52,35 @@ The intended contribution combines reproducible evaluation, ordinal errors,
 uncertainty across patient splits, preprocessing sensitivities and computational
 cost. Empirical results remain placeholders pending authorization and review.
 
+The central proposition is that a useful benchmark should explain \emph{what
+an improvement buys}. A higher aggregate score may come with worse recall
+for an urgent class, more distant ordinal disagreements, or a large increase
+in training cost. Conversely, a smaller model can be attractive without
+winning every metric. The study therefore keeps a single confirmatory
+criterion while placing it alongside complementary descriptive evidence.
+These views explain a comparison; they do not create additional criteria for
+declaring H1 successful after observing results.
+
+The scope is deliberately narrow: one versioned data source, seven structured
+inputs, eight primary algorithms and a shared patient-level evaluation
+design. Excluding free text keeps differences in text representation and
+language-model pretraining outside the main comparison. The intended output
+is a reusable reference protocol for later work on ordinal or interpretable
+models, with clear boundaries on what its retrospective labels can establish.
+
+\begin{figure*}[t]
+\centering
+\input{figures/benchmark-flow}
+\caption{Primary predictive-model workflow. Each model and applicable balancing strategy
+uses the same patient assignments. Candidate settings are selected on
+validation data; test labels do not select settings or models. The diagram
+describes the protocol and contains no observed cohort counts or results.}
+\Description{Eight boxes show fixed inputs, patient splits, training-only
+preprocessing, validation selection, frozen refitting, held-out test assessment,
+complementary metrics and paired-seed inference. Arrows keep selection before test.}
+\label{fig:flow}
+\end{figure*}
+
 \section{Related Work}
 Earlier work compared ordinal regression, neural networks and Bayesian models
 for assigned Emergency Severity Index levels~\cite{chonde2013comparison}.
@@ -69,6 +103,40 @@ The proposed distinction is the joint evaluation protocol, including a
 registered complex-versus-simple contrast, ordinal errors and sensitivities.
 This bounded review supports a protocol-focused contribution and no primacy claim.
 
+Table~\ref{tab:related} makes the comparison scope explicit. Studies of
+downstream outcomes ask whether a patient will subsequently experience an
+event; this benchmark asks how well limited structured inputs reproduce an
+existing triage assignment. Neither task can be substituted for the other.
+Even when the target is acuity, additional complaint text or engineered
+clinical scores changes the information available to the model. A numerical
+cross-paper ranking would therefore confound model choice with differences
+in cohort construction, inputs and evaluation design.
+
+\begin{table*}[t]
+\caption{Position relative to selected prior work. This is a bounded comparison,
+not a systematic review. ``Not verified'' refers to the material accessed;
+it does not establish that a feature of the original protocol was absent.}
+\label{tab:related}
+\begin{tabular}{@{}p{0.16\textwidth}p{0.21\textwidth}p{0.29\textwidth}p{0.27\textwidth}@{}}
+\toprule
+Study & Prediction target & Information and scope & Implication for this benchmark \\
+\midrule
+Chonde et al.~\cite{chonde2013comparison} & Assigned Emergency Severity Index & Clinical triage predictors; ordinal regression, neural and Bayesian model comparison; abstract-level access & Model-complexity comparisons for acuity have an established precedent. \\
+Xie et al.~\cite{xie2022benchmark} & Hospitalization, critical outcomes, reattendance & Public ED benchmark with structured and other predictors; full text accessed & Supports reproducible ED benchmarking, but addresses different endpoints. \\
+Yaddaden et al.~\cite{scc2023prediagnosis} & Acuity, hospitalization, mortality & MIMIC-based prediction with feature transformations; grouping and full protocol not verified from abstract & Direct acuity precedent; reported scores are not a matched comparison. \\
+Li et al.~\cite{li2025hybrid} & Recorded acuity & Structured inputs, engineered scores and a text-enhanced hybrid; full text accessed & A close task precedent with a different information set and cohort construction. \\
+Present protocol & Recorded five-level acuity & Seven structured inputs; repeated patient splits; registered contrasts, ordinal errors and cost & Contribution lies in the joint controlled evaluation, subject to empirical review. \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+Two records in this review were accessible only at abstract level, limiting
+claims about their split procedures and tuning. The literature comparison
+accordingly identifies methodological differences and unanswered details,
+rather than treating an undocumented choice as an established flaw. The
+present study must support its own conclusions with within-protocol paired
+comparisons, not with apparently better accuracy than an external paper.
+
 \section{Materials and Methods}
 \subsection{Data, target and scope}
 The data source is MIMIC-IV-ED version 2.2~\cite{mimicived22}.
@@ -89,12 +157,30 @@ delete a visit. A prespecified temperature rule converts entries in a
 Celsius-like range to Fahrenheit. These rules are fixed in configuration.
 \pending{Insert the authorized cohort flow, exclusions and masked class counts.}
 
+The seven inputs describe a deliberately restricted information set. They
+do not capture the entire triage assessment: the recorded label can reflect
+information not present in these columns. Thus, irreducible disagreement
+under this feature set is possible without implying an implementation
+failure or an incorrect clinical assignment. Conversely, close agreement
+would not show that the model independently recovered physiological severity.
+This distinction motivates examining documentation-related features and
+reporting several kinds of disagreement.
+
 \subsection{Patient splits and preprocessing}
 Ten seeds specify repeated 70\%/15\%/15\% training, validation and test splits.
 All visits from one patient remain in one partition. Patients are stratified
 by their most urgent recorded visit. Fractions therefore refer to patients;
 visit fractions need not be identical. Different seeds reuse the same source
 cohort and produce overlapping holdouts.
+
+Figure~\ref{fig:flow} separates the roles of the partitions. The training
+partition estimates preprocessing statistics and model parameters;
+validation compares candidate configurations; test data assess the frozen
+procedure. Keeping all visits from a patient together prevents repeated
+visits from appearing on both sides of a split. It does not remove temporal
+changes in care or make the ten holdouts independent. Performance remains
+visit-weighted, while the split and within-test bootstrap use patients as
+the grouping unit.
 
 Numeric missing values are imputed with training medians. Models requiring
 scaling use training means and standard deviations. Missingness indicators
@@ -103,11 +189,34 @@ status category. Preprocessing and balancing are fitted within the training
 pipeline; validation and test visits are not resampled.
 
 Primary variant A retains visits with nonnumeric pain and encodes its status.
-Variant B retains visits whose pain parser yields a valid numeric value; it
-inherits A's patient assignments. Variant C uses A's visits but removes
+Variant B retains valid plain numeric pain entries in $[0,10]$, excluding
+ranges and fractions; it inherits A's patient assignments. Variant C uses A's visits but removes
 explicit missingness indicators and pain status, without rebalancing. Median
 imputation remains in C, so it is an ablation of explicit features, not a
 causal separation of physiology from documentation.
+
+\begin{figure*}[t]
+\centering
+\input{figures/representation-variants}
+\caption{The three registered data representations. A and C retain the same
+visits; B retains plain numeric pain in $[0,10]$, excluding ranges and fractions, and shares the original
+patient assignments. Equal card sizes do not represent sample sizes. The
+A/B comparison uses common test visits, while A/C tests the removal of
+explicit documentation features. This is a design schematic, not a result.}
+\Description{Three equal-size cards compare A with values, missingness flags
+and pain status; B with a plain-numeric-pain subset and no pain status; and C
+with A's visits but without explicit missingness flags or pain status.}
+\label{fig:variants}
+\end{figure*}
+
+As Figure~\ref{fig:variants} shows, B is more than a different numerical
+encoding: it changes which visits remain available for training and
+evaluation. Its effect cannot be interpreted as the isolated value of a
+pain feature. Restricting the A/B evaluation to common test visits avoids
+one direct population mismatch, but does not make the two training cohorts
+identical. C provides a different check: it holds visit membership fixed
+while removing explicit indicators and status categories. Neither
+comparison randomizes documentation or identifies a causal mechanism.
 
 \subsection{Models and selection}
 Table~\ref{tab:models} defines the primary groups. ``Simple'' and ``complex''
@@ -147,6 +256,15 @@ Dummies have no hyperparameter search and receive one configuration.
 An equal configuration count is not an equal compute budget or search
 coverage: search-space dimensions and training caps differ.
 
+The primary model set covers linear, probabilistic, distance-based,
+single-tree, ensemble, kernel and neural approaches. This breadth is useful
+for a benchmark, but the result should not be read as a comparison of two
+homogeneous theory classes. In particular, the H1 winner in a group may
+change across seeds. H1 evaluates the \emph{validation-based selection
+procedure} for each group. A secondary fixed-model comparison, chosen by
+mean validation performance, asks whether that interpretation is sensitive
+to repeatedly changing the winning algorithm.
+
 \subsection{Metrics and registered inference}
 Here, ``registered'' refers to the repository's versioned analysis plan,
 rather than an external study registry.
@@ -158,6 +276,36 @@ and error distances. Undertriage means a prediction less urgent than the
 recorded label ($\hat y>y$); overtriage means $\hat y<y$. Severe undertriage
 requires $\hat y-y\geq2$. These are disagreements with recorded labels, not
 adjudicated clinical errors.
+
+Balanced accuracy averages recall across classes, while Macro-F1 reflects
+both precision and recall within each class. MAE measures the average
+number of acuity levels separating prediction and record. QWK measures
+agreement using quadratic disagreement weights and a chance-agreement
+reference. These summaries answer different questions: equal Macro-F1 does
+not require equal ordinal distance, and a favorable ordinal average can
+still conceal poor recognition of an individual class.
+
+\begin{figure}[t]
+\centering
+\input{figures/ordinal-disagreement}
+\caption{Conceptual reading of ordinal disagreement. Cells contain the
+signed label difference $d=\hat y-y$, not visit frequencies or model
+predictions. Positive values mean less urgent predicted labels; negative
+values mean more urgent labels. Magnitude distinguishes adjacent from
+distant disagreement, without assigning a calibrated clinical harm.}
+\Description{A five by five conceptual grid displays predicted minus recorded
+acuity. Zero values lie on the diagonal, positive differences above it and
+negative differences below it. Entries are label differences, not counts.}
+\label{fig:ordinal}
+\end{figure}
+
+Figure~\ref{fig:ordinal} illustrates why direction and distance are reported
+separately. For example, a recorded level 1 predicted as level 2 and one
+predicted as level 4 are both disagreements in the same direction, but
+have distances one and three. These are arithmetic examples, not observed
+cases. A one-level difference also need not have the same clinical meaning
+at every point of the scale. Ordinal metrics preserve ordering but do not
+supply an externally validated clinical loss function.
 
 \textbf{H1: complex versus simple.} In A without rebalancing, the highest
 validation Macro-F1 selects one model per group in each seed. Define
@@ -193,6 +341,31 @@ and alternative probability decodings are descriptive. A/B comparisons use
 common test visits; separate full-test means are not directly comparable.
 The registered A/C contrast is paired by seed and model.
 
+The practical margin of 0.01 in H1 was fixed in the analysis plan; it is not
+an empirically estimated threshold for clinical utility. The all-positive
+seed requirement adds directional consistency to the corrected interval
+criterion. It is intentionally stricter than reporting a positive average
+alone. Descriptive Friedman/Nemenyi ranks and uncorrected paired tests
+cannot replace this rule. The main claim remains restricted to the
+registered contrast on one dataset.
+
+\subsection{Interpretability}
+Grouped permutation importance examines one model from each primary group,
+selected by mean validation Macro-F1 without rebalancing. A raw vital sign
+is permuted together with the missingness information generated from it;
+pain value and pain status are permuted together. This preserves the
+connection between representations of the same input. Importance is the
+change in a metric after permutation, summarized descriptively across
+repetitions and seeds. It indicates model reliance under this intervention,
+not that changing a vital sign would change a patient's acuity.
+
+Correlated predictors can share information, making a single group's
+permutation effect difficult to equate with unique clinical importance.
+Likewise, reliance on pain status could reflect a documentation signal.
+The interpretation must therefore connect importance with the representation
+sensitivities and complete/incomplete predictor strata. No new feature set
+or model is selected from these test-based descriptive analyses.
+
 \subsection{Completion, cost and reproducibility}
 The registered cutoff is 10 November 2026, 12:00 BRT. The principal analysis
 uses seeds 1--10 when all required primary A cells are complete at the cutoff;
@@ -202,7 +375,8 @@ duplicates and analysis exceptions must be reported. Seeds are not excluded
 on the basis of their scores.
 
 For cost comparisons, frozen configurations are refitted sequentially with
-one thread and three repetitions on the specified variant and seed.
+one thread and three repetitions on variant A, seed 1. Inference timing
+uses the validation visits.
 Training and inference costs are reported separately. Concurrent campaign
 times are operational measurements, not controlled cost comparisons.
 Inference time is expressed in milliseconds per 1,000 visits.
@@ -260,21 +434,112 @@ can coexist with lower precision; both belong in the discussion. Ordinal
 distance provides information that overall agreement alone omits.
 \pending{Explain only trade-offs supported by the authorized results.}
 
-Several limits apply regardless of the eventual ranking. Predicting recorded
-acuity evaluates agreement with a documented judgment, not clinical benefit.
-Patient separation prevents the same patient crossing partitions within a
-split, but provides neither external hospital validation nor a temporal
-deployment test. Metrics weight visits, so patients with more visits contribute
-more observations. Missingness and pain status may encode documentation
-practices; C removes explicit indicators but retains imputation.
+\subsection{Interpreting the complexity comparison}
+The original benchmark idea is to ask whether added model complexity earns
+a consistent improvement under a shared information set. That is narrower
+than asking which algorithm is intrinsically best. If H1 meets its
+criterion, the supported statement concerns two tuned selection procedures
+under the specified search spaces and training restrictions. It would not
+imply that every complex model outperforms every simple one, or that the
+winning group transfers to a different hospital. If H1 does not meet the
+criterion, the direction, size and uncertainty of the differences still
+matter; failure to establish superiority is not a proof of equality.
 
-The comparison is conditional on search spaces, training caps and
-early-stopping behavior. Random oversampling can put duplicated rows into
-both portions of MLP's internal early-stopping split. The registered review
-also identifies batch-size sensitivity of effective MLP class weighting.
-These limitations must not be concealed by an aggregate ranking. At most
-ten correlated splits provide limited inferential precision; a descriptive
-rank is not evidence of universal algorithm superiority.
+The fixed-model robustness check helps distinguish a stable algorithmic
+advantage from a selection procedure that picks different winners. Both
+views can be informative, but the secondary check must retain its
+descriptive role. Replacing the registered contrast with whichever ranking
+looks most favorable would answer a different question. The same principle
+applies to alternative probability decodings: they illuminate decision
+rules without retrospectively replacing the primary argmax analysis.
+
+\subsection{Class imbalance and ordinal disagreements}
+Rebalancing changes the training objective or sample distribution; it does
+not by itself establish a desirable operating point. An increase in urgent
+class recall can produce more false urgent predictions, reducing precision.
+The conjunction in H2 asks for simultaneous improvement in three specified
+metrics, while class-level reporting makes trade-offs visible. Descriptive
+accuracy, QWK and ordinal rates then show aspects of behavior that are not
+captured by a single significance decision.
+
+The conditional urgent-undertriage rate also answers a different question
+from the marginal rate. Its denominator contains visits with recorded
+acuity at most 2, whereas the marginal rate includes all evaluated visits.
+Neither should be described as a measured clinical safety rate. The scale
+reflects an assigned label, and the study does not establish whether an
+individual disagreement would cause delay, resource misuse or patient harm.
+Those questions require outcomes and a different validation design.
+
+\subsection{Physiology, documentation and cohort selection}
+Missing measurements can be informative to a prediction system even when
+their information concerns workflow rather than physiology. A model using
+an explicit absence indicator may reproduce a documentation pattern that
+is associated with the recorded label. That can improve label agreement
+within the same source environment without demonstrating robustness when
+measurement practices change. This is why the benchmark examines feature
+representation instead of interpreting all predictive information as a
+physiological signal.
+
+The A/C comparison is useful precisely because visit membership stays
+fixed. However, imputed medians can themselves remain recognizable,
+especially to models that partition the feature space. Removing explicit
+indicators is therefore a sensitivity check with a limited estimand. The
+A/B comparison has another limitation: a parser-defined subset may have a
+different case mix. Complete/incomplete strata also differ observationally.
+Any difference across these analyses must be described as conditional
+performance, not as the causal effect of missingness or of discarding text.
+
+\subsection{Performance relative to computational cost}
+The benchmark's cost component addresses the practical side of the original
+proposal. A small score difference and a large runtime difference may lead
+to a different research choice than a score ranking alone. The reverse is
+also possible: extra computation could accompany a meaningful and
+consistent improvement. Neither statement is an observed finding here.
+The final discussion must connect authorized effect estimates with
+controlled timings rather than assume that simpler names imply faster
+fitting or inference.
+
+Search cost, final fitting cost and prediction cost are distinct. Equal
+numbers of candidate configurations do not make these costs equal, and
+the SVM training cap further conditions its comparison. A sequential
+single-thread refit reduces one source of timing confounding but does not
+characterize every deployment environment or multicore implementation.
+Timing conclusions should specify the measured hardware and workload;
+concurrent wall times are useful operational evidence, not interchangeable
+performance benchmarks.
+
+Early stopping introduces another constraint: random oversampling can put
+duplicated rows into both portions of MLP's internal validation split. The
+registered review also identifies batch-size sensitivity of effective MLP
+class weighting. These declared limits remain part of the comparison; they
+are not repaired retrospectively through a new campaign. At most ten
+correlated splits also limit inferential precision, regardless of rank.
+
+\subsection{Validity, reuse and scope of future work}
+The absence of observation timestamps limits claims about the order in
+which predictors and acuity were available. The information set should be
+described as fields in the triage table, without implying prospective
+availability before the assignment. Similarly, patient-disjoint holdouts
+reduce one form of leakage but cannot measure transport across time,
+institutions or documentation policies. No demographic fairness conclusion
+is supported by a design that does not conduct a corresponding subgroup
+analysis. These limits remain even if aggregate performance is favorable.
+
+A reusable preparation and evaluation pipeline can support later work,
+including text-enhanced, interpretable or explicitly ordinal methods.
+Such extensions should define distinct research questions and disclose
+any shared cohort, baseline results or infrastructure. They are not
+independent replications merely because another model is added. The
+present paper should establish a carefully bounded reference comparison
+before making claims about improvements in a separate project.
+
+Finally, reproducibility and access permission are separate requirements.
+A versioned configuration and passing synthetic tests establish useful
+software evidence; they do not certify the stored empirical outputs.
+Freezing the eligible task inventory and checking result/configuration
+hashes are needed before principal-analysis certification. Authorized
+review must also verify the coherence of metrics and private predictions
+and apply disclosure rules to every published table and figure.
 
 \section{Conclusion and Future Work}
 This manuscript defines a controlled benchmark for predicting recorded

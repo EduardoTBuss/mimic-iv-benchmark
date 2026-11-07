@@ -4,6 +4,12 @@ English, anonymous working draft. **Not submission-ready:** every empirical resu
 remains a visible placeholder. No MIMIC-derived file is an input to the manuscript
 build. The manuscript contains no campaign figures, cohort counts or metrics.
 
+Current revision (2026-11-07): six pages, three original vector schematics, an
+expanded related-work comparison and a fuller discussion of the original benchmark
+idea. The figures explain the workflow, representations A/B/C and signed ordinal
+disagreement; none visualizes measured performance. Figure sources and provenance
+are in `figures/README.md`. This revision supersedes the earlier three-page draft.
+
 ## Build locally
 
 From this directory:
