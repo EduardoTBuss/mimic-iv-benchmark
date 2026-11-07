@@ -31,6 +31,7 @@ def stats_config(cfg: dict) -> dict:
           if m not in cfg["models"].get("reference", []) and not applicability(m, s, cfg)[0]]
     n_seeds = len(cfg["split"]["seeds"])
     return {"variant_main": primary, "variant_sens": others[0] if others else None,
+            "variant_ablation": "C_values_only",
             "strategies": list(cfg["imbalance"]["strategies"]), "not_applicable": na,
             "simple_models": list(groups.get("simple", [])), "complex_models": list(groups.get("complex", [])),
             "extra_models": list(cfg["models"].get("extra", [])), "reference_models": list(cfg["models"].get("reference", [])),
@@ -67,20 +68,22 @@ def run_cost_stage(cfg: dict, cdir: Path, prepared: Path) -> None:
         log.warning("cost benchmark exited with code %s (report continues without it)", code)
 
 
-def analyze_and_report(cfg: dict, campaign: Path | None = None) -> Path:
-    from triagebench.analysis.stats import run_preregistered_analysis
+def analyze_and_report(cfg: dict, campaign: Path | None = None, *, analysis_time: str | None = None) -> Path:
+    from triagebench.analysis.stats import REQUIRED_METRIC_COLS, run_preregistered_analysis
     from triagebench.reporting.summary import write_reports
 
     cdir = Path(campaign) if campaign else resolve_campaign_dir(cfg)
     meta = read_json(cdir / "campaign.json")
     prep = Path(cfg["paths"]["outputs"]) / "prepared" / meta["prepared_id"]
     tables = aggregate_campaign(cdir)
-    stats = None
-    if not tables["metrics"].empty:
-        preds = load_predictions(cdir, partitions=("test",))
-        stats = run_preregistered_analysis(tables["metrics"], preds, stats_config(cfg),
-                                           n_boot=int((cfg.get("analysis") or {}).get("n_boot", 1000)))
-        atomic_write_json(cdir / "tables" / "stats.json", stats)
+    metrics = tables["metrics"]
+    preds = load_predictions(cdir, partitions=("test",)) if not metrics.empty else None
+    if metrics.empty:
+        metrics = metrics.reindex(columns=REQUIRED_METRIC_COLS + ["finished_at"])
+    stats = run_preregistered_analysis(metrics, preds, stats_config(cfg),
+                                       n_boot=int((cfg.get("analysis") or {}).get("n_boot", 1000)),
+                                       analysis_time=analysis_time)
+    atomic_write_json(cdir / "tables" / "stats.json", stats)
     return write_reports(cfg, cdir, tables, stats, prep if prep.exists() else None)
 
 

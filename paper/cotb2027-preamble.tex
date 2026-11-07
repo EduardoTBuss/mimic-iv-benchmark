@@ -1,0 +1,65 @@
+\documentclass[sigconf, nonacm, screen, anonymous, language=portuguese, language=spanish, language={main=english}]{acmart}
+
+\AtBeginDocument{%
+  \providecommand\BibTeX{{%
+    \normalfont B\kern-0.5em{\scshape i\kern-0.25em b}\kern-0.8em\TeX}}}
+
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\let\Bbbk\relax
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{graphicx}
+
+\settopmatter{printccs=false, printacmref=false}
+\renewcommand\footnotetextcopyrightpermission[1]{}
+
+\makeatletter
+\newcounter{cotbNumAuthors}
+\let\cotb@originalauthor\author
+\renewcommand{\author}[1]{%
+  \stepcounter{cotbNumAuthors}%
+  \ifnum\value{cotbNumAuthors}=1
+    \gdef\cotbFirstAuthorName{#1}%
+  \fi
+  \cotb@originalauthor{#1}%
+}
+\makeatother
+
+\newcommand{\cotbEventInfo}{XVIII Computer on the Beach (COTB 2027)\\
+  Florianópolis/SC --- 13 a 17 de abril de 2027}
+
+\newcommand{\cotbHeaderAuthors}{%
+  \ifnum\value{cotbNumAuthors}>3
+    \cotbFirstAuthorName\ et al.%
+  \else
+    \shortauthors
+  \fi
+}
+
+\setlength{\headheight}{24pt}
+
+\AtBeginDocument{%
+  \fancypagestyle{firstpagestyle}{%
+    \fancyhf{}%
+    \renewcommand{\headrulewidth}{0.4pt}%
+    \renewcommand{\footrulewidth}{0pt}%
+    \fancyhead[L]{\begin{minipage}[b]{0.62\textwidth}\raggedright
+      \scriptsize\cotbEventInfo\end{minipage}}%
+    \fancyhead[R]{\begin{minipage}[b]{0.34\textwidth}\raggedleft
+      \scriptsize\cotbHeaderAuthors\end{minipage}}%
+    \fancyfoot[C]{\if@ACM@printfolios\thepage\fi}%
+  }%
+  \fancypagestyle{standardpagestyle}{%
+    \fancyhf{}%
+    \renewcommand{\headrulewidth}{0.4pt}%
+    \renewcommand{\footrulewidth}{0pt}%
+    \fancyhead[L]{\begin{minipage}[b]{0.62\textwidth}\raggedright
+      \scriptsize\cotbEventInfo\end{minipage}}%
+    \fancyhead[R]{\begin{minipage}[b]{0.34\textwidth}\raggedleft
+      \scriptsize\cotbHeaderAuthors\end{minipage}}%
+    \fancyfoot[C]{\if@ACM@printfolios\thepage\fi}%
+  }%
+  \pagestyle{standardpagestyle}%
+}

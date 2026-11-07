@@ -24,9 +24,12 @@ def _median_decode(p: np.ndarray) -> np.ndarray:
     return (np.cumsum(p, axis=1) >= 0.5).argmax(axis=1) + 1
 
 
-def decodings(cdir: Path, variant: str) -> pd.DataFrame:
+def decodings(cdir: Path, variant: str, *, eligible_tasks: set[tuple] | None = None) -> pd.DataFrame:
     rows = []
     for d in sorted((Path(cdir) / "tasks").glob(f"{variant}__s*")):
+        _, seed, model, strategy = d.name.split("__")
+        if eligible_tasks is not None and (variant, int(seed.lstrip("s")), model, strategy) not in eligible_tasks:
+            continue
         path = d / "private" / "predictions.parquet"
         if not (d / "DONE").exists() or not path.exists():
             continue
@@ -37,8 +40,12 @@ def decodings(cdir: Path, variant: str) -> pd.DataFrame:
         test = pred[pred["partition"] == "test"]
         res = read_json(d / "result.json")
         counts = np.array([res["data"]["train_class_counts"][str(k)] for k in range(1, 6)], dtype=float)
+        if not np.isfinite(counts).all() or not (counts > 0).all():
+            raise ValueError("Alternative decodings require finite positive training class counts")
         prior = counts / counts.sum()
         p = test[pcols].to_numpy(dtype=float)
+        if not np.isfinite(p).all() or (p < 0).any() or not (p.sum(axis=1) > 0).all():
+            raise ValueError("Alternative decodings require finite nonnegative probabilities with positive row sums")
         p = p / p.sum(axis=1, keepdims=True)
         strategy = res["task"]["strategy"]
         if strategy != "none":  # undo the balanced training prior
@@ -48,7 +55,7 @@ def decodings(cdir: Path, variant: str) -> pd.DataFrame:
         decoded = {"argmax": p.argmax(axis=1) + 1, "median": _median_decode(p), "argmax_p_over_prior": (p / prior).argmax(axis=1) + 1}
         for name, yhat in decoded.items():
             m = compute_metrics(y, yhat)
-            rows.append({"model": res["task"]["model"], "strategy": strategy, "seed": res["task"]["seed"],
+            rows.append({"variant": variant, "model": res["task"]["model"], "strategy": strategy, "seed": res["task"]["seed"],
                          "decoding": name, **{k: m[k] for k in DEC_METRICS}})
     return pd.DataFrame(rows)
 
@@ -73,32 +80,58 @@ def decodings_markdown(df: pd.DataFrame, order: list[str]) -> str:
     return note + md_table(["modelo", "estratégia", "decodificação", *DEC_METRICS], rows)
 
 
-def h1_validation_selected_strategy(metrics: pd.DataFrame, cfg: dict, variant: str, delta: float = 0.01) -> dict:
-    from triagebench.analysis.stats import corrected_resampled_ttest
+def h1_validation_selected_strategy(metrics: pd.DataFrame, cfg: dict, variant: str, delta: float = 0.01,
+                                    *, seeds: list[int] | None = None) -> dict:
+    from triagebench.analysis.stats import (
+        DEFAULT_CFG,
+        _fin,
+        _is_na,
+        _merge,
+        _Store,
+        corrected_resampled_ttest,
+        select_seeds,
+    )
 
     groups = cfg["models"].get("groups") or {}
+    settings = _merge(DEFAULT_CFG, {
+        "variant_main": variant, "simple_models": groups.get("simple", []),
+        "complex_models": groups.get("complex", []),
+        "strategies": list(cfg["imbalance"]["strategies"]),
+        "expected_seeds": len(cfg["split"]["seeds"]), "min_seeds": min(5, len(cfg["split"]["seeds"])),
+    })
     m = metrics[(metrics.variant == variant) & (metrics.metric == "macro_f1")]
-    piv = m.pivot_table(index=["seed", "model", "strategy"], columns="split", values="value").reset_index()
-    rows = []
-    for seed, sub in piv.groupby("seed"):
+    store = _Store(m)
+    if seeds is None:
+        seeds = select_seeds(store, settings)["used"]
+    rows, missing = [], []
+    for seed in seeds:
+        absent = [f"{model}/{strategy}/{split}" for model in groups.get("simple", []) + groups.get("complex", [])
+                  for strategy in settings["strategies"] if not _is_na(settings, model, strategy)
+                  for split in ("val", "test")
+                  if not _fin(store.value(variant, model, strategy, split, "macro_f1", seed))]
+        if absent:
+            missing.append({"seed": seed, "cells": absent})
+            continue
         best = {}
         for group in ("simple", "complex"):
-            cand = sub[sub.model.isin(groups.get(group, []))].dropna(subset=["val", "test"])
-            if cand.empty:
-                break
-            # per model: strategy with the best validation macro-F1; then best model of the group by validation
-            per_model = cand.loc[cand.groupby("model")["val"].idxmax()]
-            pick = per_model.loc[per_model["val"].idxmax()]
-            best[group] = pick
+            # Model and strategy configuration order give deterministic validation ties.
+            candidates = [(model, strategy) for model in groups.get(group, [])
+                          for strategy in settings["strategies"] if not _is_na(settings, model, strategy)]
+            if not candidates:
+                continue
+            model, strategy = max(candidates, key=lambda pair: store.value(
+                variant, pair[0], pair[1], "val", "macro_f1", seed))
+            best[group] = (model, strategy, store.value(variant, model, strategy, "test", "macro_f1", seed))
         if len(best) == 2:
-            rows.append({"seed": int(seed), "simple": f"{best['simple'].model}/{best['simple'].strategy}",
-                         "complex": f"{best['complex'].model}/{best['complex'].strategy}",
-                         "delta": float(best["complex"].test - best["simple"].test)})
+            simple, complex_ = best["simple"], best["complex"]
+            rows.append({"seed": int(seed), "simple": f"{simple[0]}/{simple[1]}",
+                         "complex": f"{complex_[0]}/{complex_[1]}", "delta": float(complex_[2] - simple[2])})
     diffs = [r["delta"] for r in rows]
     fr = cfg["split"]["fractions"]
     t = corrected_resampled_ttest(diffs, fr["train"], fr["test"]) if len(diffs) >= 2 else {}
     consistent = bool(diffs) and all(d > 0 for d in diffs) and t.get("ci_low", float("nan")) > delta
-    return {"per_seed": rows, "test": t, "consistent": consistent, "delta": delta}
+    return {"per_seed": rows, "test": t, "consistent": consistent, "delta": delta,
+            "seeds_selected": list(seeds), "missing_cells": missing, "role": "descriptive"}
 
 
 def h1_secondary_markdown(res: dict) -> str:

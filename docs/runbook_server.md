@@ -64,6 +64,17 @@ relatório agregado para `reports/campaigns/<id>/` (pode ir ao git).
 
 ## Campanha `main-38c9f7c0a8` (lançada em 05/11 00:38) — fechamento
 
+> Atualização de código de 06/11/2026: o pós-processamento distingue
+> `technical_preview` antes de **10/11/2026 12h BRT** de
+> `pending_cutoff_provenance` a partir do corte. Neste segundo estado,
+> `principal_analysis=false` e os resultados inferenciais principais ficam
+> bloqueados. Ainda falta implementar/verificar o inventário imutável de
+> completude no corte; `finished_at` do produtor, isoladamente, não o comprova.
+> Preservar localmente inventário, hashes dos resultados/configurações e provas
+> de completude sem incluir tarefas tardias. Ver `docs/paper_preparation.md`.
+> Os comandos abaixo processam dados/derivados: execução somente em ambiente
+> autorizado, fora deste serviço enquanto sua elegibilidade não for confirmada.
+
 - Q-FLEX: variantes A+B (tmux `triagebench`, código `code/` @ ae4b22d). Ao terminar, o `run-all` roda o benchmark
   de custo e uma análise; depois o **finalizador** (tmux `triagebench-finisher`, `~/mimic-iv-benchmark/finisher.sh`)
   roda importância por permutação + análise completa com `code-next/` (@ 8a831d0). Log: `launch-logs/finisher-*.log`.

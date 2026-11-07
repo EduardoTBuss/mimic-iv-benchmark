@@ -3,6 +3,25 @@
 MIMIC-IV-ED v2.2 é dado credenciado (PhysioNet Credentialed Health Data License 1.5.0 + DUA 1.5.0,
 treinamento CITI "Data or Specimens Only Research"). Regras deste projeto:
 
+## Escopo autorizado nesta preparação (2026-11-06)
+
+Eduardo autorizou Codex e subagentes a trabalhar em código, testes inteiramente
+sintéticos, configuração, documentação metodológica, literatura pública e artigo
+com placeholders. Essa autorização de escopo não confirma elegibilidade do serviço
+para receber dados ou derivados e não revoga a restrição registrada abaixo.
+
+Até confirmação específica, este serviço não deve abrir, processar, resumir ou
+enviar dados MIMIC, predições por paciente/estadia, `private/`, `outputs/` ou
+relatórios, tabelas e figuras derivados da campanha, mesmo agregados/mascarados.
+Um PDF autoral com placeholders, gerado somente de texto metodológico e fontes
+públicas, não é um relatório de resultados da campanha.
+
+Atualizações no GitHub nesta etapa abrangem somente os arquivos autorizados de
+código/documentação/manuscrito; nunca incluir `reports/campaigns/` por arrasto.
+As referências históricas à exclusão de Codex na regra zero devem ser lidas com
+esta exceção restrita para trabalho sem dados. A análise empírica continua fora
+do escopo enquanto a elegibilidade e os derivados permitidos não forem confirmados.
+
 ## Regra zero
 
 1. **Nenhum dado no git.** Nem linha, nem `subject_id`/`stay_id`, nem predição por estadia, nem

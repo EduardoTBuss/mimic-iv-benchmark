@@ -33,6 +33,8 @@ def aggregate_campaign(cdir: Path) -> dict[str, pd.DataFrame]:
     metrics, per_class, confusion, abs_err, timings = [], [], [], [], []
     for r in results:
         key = {k: r["task"][k] for k in KEYS}
+        # Preserve producer provenance; aggregate-file mtime is not task completion time.
+        key["finished_at"] = r.get("finished_at")
         for split in ("val", "test"):
             m = r[split]
             for name, value in m.items():

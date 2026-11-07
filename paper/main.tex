@@ -1,0 +1,300 @@
+\input{cotb2027-preamble}
+\newcommand{\pending}[1]{\textbf{[Pending: #1]}}
+\renewcommand{\shortauthors}{Anonymous submission}
+\begin{document}
+\title{Predicting Recorded Emergency Triage Acuity: A Reproducible MIMIC-IV-ED Benchmark}
+
+\begin{abstract}
+This study compares machine learning models for predicting the five-level acuity
+recorded during emergency department triage from six vital signs and pain.
+The benchmark specifies eight primary models, patient-disjoint training,
+validation and test partitions, and validation-based hyperparameter selection.
+Macro-F1 is the primary metric; class-specific performance, ordinal errors and
+computational cost provide complementary views. Registered sensitivity analyses
+examine pain representation and explicit missingness indicators.
+\pending{Insert authorized effect estimates, uncertainty and hypothesis decisions
+after independent statistical review.}
+\pending{Add the conclusion supported by those results.}
+The scope is retrospective prediction of recorded labels; the study does not
+evaluate clinical benefit or deployment safety.
+\end{abstract}
+\keywords{Emergency department, triage acuity, ordinal classification, machine learning, reproducible benchmarking}
+\maketitle
+\selectlanguage{english}
+
+\section{Introduction}
+Emergency department triage assigns urgency levels to guide the order in which
+patients receive attention. Predicting a recorded triage level from structured
+measurements is an ordinal classification problem: confusing nearby levels and
+confusing distant levels have different meanings. It is also a label-reproduction
+task. Agreement with a historical assignment does not establish that the
+assignment was clinically correct.
+
+MIMIC-IV-ED contains emergency department records with vital signs,
+pain and acuity~\cite{mimicived22}. Existing work includes public emergency
+care benchmarks~\cite{xie2022benchmark} and acuity-prediction
+models~\cite{scc2023prediagnosis,li2025hybrid}.
+The motivation here is a controlled comparison under an explicit protocol,
+rather than a claim to introduce machine learning for this task.
+
+Our question is: \emph{under a fixed search budget and patient-separated
+evaluation, do the designated complex models consistently outperform the
+designated simple models in predicting recorded acuity?} A second question asks
+whether class weighting or random oversampling improves both minority-class
+recall and overall class-balanced performance.
+
+The intended contribution combines reproducible evaluation, ordinal errors,
+uncertainty across patient splits, preprocessing sensitivities and computational
+cost. Empirical results remain placeholders pending authorization and review.
+
+\section{Related Work}
+Earlier work compared ordinal regression, neural networks and Bayesian models
+for assigned Emergency Severity Index levels~\cite{chonde2013comparison}.
+
+Xie et al.~\cite{xie2022benchmark} introduced a MIMIC-IV-ED benchmark for
+hospitalization, critical outcomes and emergency department reattendance.
+These targets differ from reproducing a recorded acuity level. Their work
+provides a precedent for open preprocessing and model comparison;
+performance values are not directly comparable across these tasks.
+
+The SCC study~\cite{scc2023prediagnosis} includes triage acuity prediction
+alongside hospitalization and mortality. Li et al.~\cite{li2025hybrid} also
+predict acuity using structured triage variables and additional derived or
+textual information. Neither the target nor the use of common machine
+learning models is new. Cohort selection, predictors, grouping, missing-data
+handling and scoring must be considered before comparing conclusions.
+
+Our narrower predictor set excludes demographics and chief-complaint text.
+The proposed distinction is the joint evaluation protocol, including a
+registered complex-versus-simple contrast, ordinal errors and sensitivities.
+This bounded review supports a protocol-focused contribution and no primacy claim.
+
+\section{Materials and Methods}
+\subsection{Data, target and scope}
+The data source is MIMIC-IV-ED version 2.2~\cite{mimicived22}.
+PhysioNet distributes the database~\cite{physionet2026,goldberger2000physionet}.
+The target is \texttt{acuity} in $\{1,2,3,4,5\}$, with 1 indicating the most
+urgent level. Inputs are temperature, heart rate, respiratory rate, oxygen
+saturation, systolic and diastolic blood pressure, and pain. Patient and visit
+identifiers are used for grouping and alignment, never as predictors.
+Chief-complaint text is excluded.
+The official table documentation describes nurse-assigned levels and does not
+provide observation timestamps~\cite{mimictriagedoc}; we therefore do not claim
+that these predictors precede the triage decision prospectively.
+
+Visits without a valid target are excluded. Value-cleaning rules mark outliers
+as missing or clip them to prespecified bounds, following the two-tier approach
+used by Xie et al.~\cite{xie2022benchmark}. Cleaning a predictor does not itself
+delete a visit. A prespecified temperature rule converts entries in a
+Celsius-like range to Fahrenheit. These rules are fixed in configuration.
+\pending{Insert the authorized cohort flow, exclusions and masked class counts.}
+
+\subsection{Patient splits and preprocessing}
+Ten seeds specify repeated 70\%/15\%/15\% training, validation and test splits.
+All visits from one patient remain in one partition. Patients are stratified
+by their most urgent recorded visit. Fractions therefore refer to patients;
+visit fractions need not be identical. Different seeds reuse the same source
+cohort and produce overlapping holdouts.
+
+Numeric missing values are imputed with training medians. Models requiring
+scaling use training means and standard deviations. Missingness indicators
+remain binary and unscaled. Pain is parsed into a numeric value and a fixed
+status category. Preprocessing and balancing are fitted within the training
+pipeline; validation and test visits are not resampled.
+
+Primary variant A retains visits with nonnumeric pain and encodes its status.
+Variant B retains visits whose pain parser yields a valid numeric value; it
+inherits A's patient assignments. Variant C uses A's visits but removes
+explicit missingness indicators and pain status, without rebalancing. Median
+imputation remains in C, so it is an ablation of explicit features, not a
+causal separation of physiology from documentation.
+
+\subsection{Models and selection}
+Table~\ref{tab:models} defines the primary groups. ``Simple'' and ``complex''
+are operational groupings fixed by the protocol, not a universal ordering of
+model capacity or cost.
+
+\begin{table}[t]
+\caption{Primary groups and training-size exceptions.}
+\label{tab:models}
+\begin{tabular}{@{}p{0.17\columnwidth}p{0.73\columnwidth}@{}}
+\toprule
+Group & Models \\
+\midrule
+Simple & Logistic regression, Gaussian naive Bayes, $k$-nearest neighbors (KNN), decision tree \\
+Complex & Random forest, radial-basis support vector machine (SVM), XGBoost, multilayer perceptron (MLP) \\
+\bottomrule
+\end{tabular}
+\smallskip
+
+\footnotesize SVM uses up to 30,000 training rows for search and final fitting.
+KNN uses up to 100,000 rows during search, then the full training partition for
+final fitting. Caps follow any training oversampling.
+\end{table}
+
+Histogram gradient boosting, ExtraTrees and proportional-odds ordinal logistic
+regression are descriptive extras. Prior-based and stratified random dummy
+classifiers provide references. Extras and dummies do not enter H1.
+
+Each applicable predictive model--strategy combination receives 20 candidate
+configurations, including defaults. Selection uses validation Macro-F1.
+The selected configuration is refitted on training data, with the final
+training-size exception in Table~\ref{tab:models}, before test assessment.
+No model, strategy, hyperparameter or seed is selected using test scores.
+Strategies are no rebalancing, class weighting and random oversampling;
+KNN has no class-weight condition, and dummies run without rebalancing.
+Dummies have no hyperparameter search and receive one configuration.
+An equal configuration count is not an equal compute budget or search
+coverage: search-space dimensions and training caps differ.
+
+\subsection{Metrics and registered inference}
+Here, ``registered'' refers to the repository's versioned analysis plan,
+rather than an external study registry.
+The primary metric is test Macro-F1, the unweighted mean of five class F1
+scores. F1 combines precision and recall; the unweighted mean gives each
+acuity class equal weight. Secondary measures include balanced accuracy, class-specific precision
+and recall, mean absolute ordinal error (MAE), quadratic weighted kappa (QWK),
+and error distances. Undertriage means a prediction less urgent than the
+recorded label ($\hat y>y$); overtriage means $\hat y<y$. Severe undertriage
+requires $\hat y-y\geq2$. These are disagreements with recorded labels, not
+adjudicated clinical errors.
+
+\textbf{H1: complex versus simple.} In A without rebalancing, the highest
+validation Macro-F1 selects one model per group in each seed. Define
+$\Delta_s=F_{1,\mathrm{macro}}^{\mathrm{complex},s}
+-F_{1,\mathrm{macro}}^{\mathrm{simple},s}$ on test data.
+Consistent superiority requires $\Delta_s>0$ in every analyzed seed and a
+corrected 95\% confidence-interval lower bound above the registered practical
+margin $\delta=0.01$. Otherwise the decision is ``no consistent superiority'';
+this does not establish equivalence.
+
+The seed is the unit of between-split inference. For $k$ paired differences,
+the registered corrected resampled $t$ procedure~\cite{nadeau2003inference} uses
+\begin{equation}
+\mathrm{SE}_{\mathrm{corr}}=
+\sqrt{\left(\frac{1}{k}+\frac{0.15}{0.70}\right)s_\Delta^2},
+\qquad \mathrm{df}=k-1.
+\end{equation}
+Here, $s_\Delta^2$ is the sample variance of the paired seed differences.
+This correction is approximate for stratified patient splits; it does not
+create independent datasets. A patient-cluster bootstrap with 1,000 resamples
+provides separate within-seed test-sampling intervals. These intervals do not
+replace H1 or include retraining uncertainty.
+
+\textbf{H2: rebalancing.} For each primary model and applicable strategy,
+paired differences against no rebalancing are assessed for class-1 recall,
+Macro-F1 and balanced accuracy. Support requires positive mean differences
+and Holm-adjusted $p<0.05$ for all three measures. Holm correction is applied
+across primary models within each strategy--metric family (six families);
+there is no single global multiplicity claim across them.
+
+Ordinal summaries, rankings, fixed-model robustness checks, B/C sensitivities
+and alternative probability decodings are descriptive. A/B comparisons use
+common test visits; separate full-test means are not directly comparable.
+The registered A/C contrast is paired by seed and model.
+
+\subsection{Completion, cost and reproducibility}
+The registered cutoff is 10 November 2026, 12:00 BRT. The principal analysis
+uses seeds 1--10 when all required primary A cells are complete at the cutoff;
+otherwise it uses the largest complete prefix with at least five seeds.
+Earlier analyses are technical previews. Missing cells, nonfinite values,
+duplicates and analysis exceptions must be reported. Seeds are not excluded
+on the basis of their scores.
+
+For cost comparisons, frozen configurations are refitted sequentially with
+one thread and three repetitions on the specified variant and seed.
+Training and inference costs are reported separately. Concurrent campaign
+times are operational measurements, not controlled cost comparisons.
+Inference time is expressed in milliseconds per 1,000 visits.
+\pending{Verify common hardware, software versions and measurement conditions
+from authorized provenance.}
+
+The implementation fixes configuration and environment versions and includes
+synthetic tests for patient separation, training-only preprocessing, model
+selection and reporting. \pending{Insert an approved anonymous artifact-access
+statement.} Restricted data, trained models and visit-level predictions are
+excluded from public artifacts. No campaign metrics or derived figures have
+been incorporated into this draft.
+
+\section{Results}
+\pending{Approved derived artifacts and independent review are required.
+No numerical result has been filled from the campaign.}
+
+\subsection{Primary contrast and balancing}
+\pending{Report the final seed prefix, validation-selected models, paired H1
+differences, corrected confidence interval, effect size and registered
+decision. Distinguish principal analysis from any earlier preview.}
+
+\begin{table}[t]
+\caption{Reserved result summary. ``Pending'' denotes unavailable evidence.}
+\label{tab:results}
+\begin{tabular}{@{}p{0.38\columnwidth}p{0.52\columnwidth}@{}}
+\toprule
+Analysis & Required result \\
+\midrule
+H1, A/no rebalancing & Pending: mean $\Delta$, corrected CI, consistency decision \\
+H2, rebalancing & Pending: three metric differences, adjusted $p$, supported contrasts \\
+Ordinal evaluation & Pending: MAE, QWK, directional errors \\
+Sensitivity B and C & Pending: paired differences and uncertainty \\
+Computational cost & Pending: controlled fit and inference time \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\pending{Add a compact primary-model table with Macro-F1, balanced accuracy,
+class-1 recall and ordinal metrics. Report HPO failures and convergence
+warnings separately from task completion.}
+
+\subsection{Ordinal errors, sensitivity and cost}
+\pending{Report error distances, class-specific precision and recall trade-offs,
+common-subset A/B differences and paired A/C differences. Include complete
+versus incomplete predictor strata. Interpret permutation importance
+descriptively, without causal claims.}
+\pending{Include at most one compact figure if it adds information beyond the
+tables. Counts and percentages require approved disclosure checks.}
+
+\section{Discussion}
+The final interpretation must follow the registered contrasts, uncertainty and
+operating constraints. A higher recall for the most urgent recorded class
+can coexist with lower precision; both belong in the discussion. Ordinal
+distance provides information that overall agreement alone omits.
+\pending{Explain only trade-offs supported by the authorized results.}
+
+Several limits apply regardless of the eventual ranking. Predicting recorded
+acuity evaluates agreement with a documented judgment, not clinical benefit.
+Patient separation prevents the same patient crossing partitions within a
+split, but provides neither external hospital validation nor a temporal
+deployment test. Metrics weight visits, so patients with more visits contribute
+more observations. Missingness and pain status may encode documentation
+practices; C removes explicit indicators but retains imputation.
+
+The comparison is conditional on search spaces, training caps and
+early-stopping behavior. Random oversampling can put duplicated rows into
+both portions of MLP's internal early-stopping split. The registered review
+also identifies batch-size sensitivity of effective MLP class weighting.
+These limitations must not be concealed by an aggregate ranking. At most
+ten correlated splits provide limited inferential precision; a descriptive
+rank is not evidence of universal algorithm superiority.
+
+\section{Conclusion and Future Work}
+This manuscript defines a controlled benchmark for predicting recorded
+five-level emergency triage acuity using structured measurements.
+\pending{Replace this sentence with the finding justified by H1/H2 and its
+effect size after authorization and independent review.}
+Future work could test transport across hospitals and time periods and
+assess clinical utility with prospective validation. These are future
+directions, not evaluations performed in this study.
+
+\section*{Acknowledgments}
+Omitted for anonymous review.
+
+\section*{Declaration of Generative AI Use}
+OpenAI Codex assisted with manuscript drafting, language editing, public-source
+literature search and code review. No restricted MIMIC records, patient-level
+predictions or campaign result artifacts were supplied to this drafting
+workflow. \pending{Before submission, authors must verify all statements and
+references and update this declaration to cover the complete workflow.}
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{references}
+\end{document}

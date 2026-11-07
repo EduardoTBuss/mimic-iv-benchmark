@@ -18,7 +18,7 @@ from triagebench.utils.config import all_models, primary_variant
 from triagebench.utils.io import atomic_write_json, atomic_write_text, read_json, utc_now
 
 MAIN_METRICS = ["macro_f1", "balanced_accuracy", "qwk", "mae_ordinal", "recall_1", "recall_5",
-                "under_triage_rate", "severe_under_triage_rate", "accuracy"]
+                "under_triage_rate", "under_triage_rate_urgent", "severe_under_triage_rate", "accuracy"]
 
 
 def _ms(values: pd.Series) -> str:
@@ -38,9 +38,10 @@ def _main_table(metrics: pd.DataFrame, timings: pd.DataFrame, variant: str, orde
                 continue
             t = timings[(timings.variant == variant) & (timings.model == m) & (timings.strategy == s)]
             rows.append([m, s, sub.seed.nunique()] + [_ms(sub[sub.metric == k].value) for k in MAIN_METRICS]
+                        + [sub[sub.metric == "under_triage_rate_urgent"].value.dropna().shape[0]]
                         + [f"{t.final_fit_seconds.median():.1f}" if not t.empty else "—",
-                           f"{1000 * (t.predict_test_seconds / t.n_test).median():.3f}" if not t.empty else "—"])
-    return md_table(["modelo", "estratégia", "seeds"] + MAIN_METRICS + ["fit final (s, mediana)", "inferência (ms/1000 estadias)"], rows)
+                           f"{1_000_000 * (t.predict_test_seconds / t.n_test).median():.3f}" if not t.empty else "—"])
+    return md_table(["modelo", "estratégia", "seeds"] + MAIN_METRICS + ["urgent metric available seeds", "fit final (s, mediana)", "inferência (ms/1000 estadias)"], rows)
 
 
 def _per_class_table(per_class: pd.DataFrame, variant: str, order: list[str]) -> str:
@@ -86,11 +87,23 @@ def _hpo_table(trials: pd.DataFrame, order: list[str]) -> str:
     return md_table(["modelo", "trials", "ok", "erro", "% ok com warning", "s por trial (mediana)"], rows)
 
 
-def _cost_table(cdir: Path) -> str:
+def _cost_table(cdir: Path, cfg: dict | None = None, stats: dict | None = None) -> str:
     path = cdir / "tables" / "cost_benchmark.parquet"
     if not path.exists():
         return "_benchmark de custo sequencial não executado; ver tempos da campanha (com concorrência) na tabela principal._"
     cb = pd.read_parquet(path)
+    provenance = ""
+    if cfg is not None:
+        cost_cfg = cfg["evaluation"].get("cost_benchmark") or {}
+        seed, variant = cost_cfg.get("seed"), cost_cfg.get("variant")
+        allowed = {(task["model"], task["strategy"]) for task in _eligible_tasks(stats)
+                   if task["variant"] == variant and task["seed"] == seed}
+        if not allowed:
+            return "_Cost benchmark omitted: its configured task/seed is outside the selected inventory._"
+        cb = cb.loc[[(m, s) in allowed for m, s in zip(cb.model, cb.strategy, strict=True)]]
+        times = ", ".join(sorted(cb["at"].dropna().astype(str).unique())) if "at" in cb else "unavailable"
+        provenance = (f"Descriptive timing only; configured variant `{variant}`, seed {seed}; "
+                      f"measurement timestamps: {times}. Independent of the prediction-integrity gate.\n\n")
     if cb.empty:
         return "_vazio_"
     g = cb.groupby(["model", "strategy"]).agg(fit_s=("fit_seconds", "median"), fit_sd=("fit_seconds", "std"),
@@ -98,18 +111,24 @@ def _cost_table(cdir: Path) -> str:
     rows = [[r.model, r.strategy, int(r.reps), f"{r.fit_s:.2f}", "—" if np.isnan(r.fit_sd) else f"{r.fit_sd:.2f}", f"{r.pred_ms:.3f}"]
             for r in g.sort_values("fit_s", ascending=False).itertuples()]
     host = cb.host.iloc[0] if "host" in cb else "?"
-    return (f"Refit sequencial com 1 thread das configurações congeladas (seed/variante do config), host `{host}`.\n\n"
+    return (provenance + f"Refit sequencial com 1 thread das configurações congeladas (seed/variante do config), host `{host}`.\n\n"
             + md_table(["modelo", "estratégia", "repetições", "treino (s, mediana)", "DP", "inferência (ms/1000)"], rows))
 
 
-def _strata_section(cfg: dict, cdir: Path, prepared_dir: Path | None, order: list[str], k: int) -> str:
+def _strata_section(cfg: dict, cdir: Path, prepared_dir: Path | None, order: list[str], k: int,
+                    stats: dict | None = None) -> str:
+    if not (stats or {}).get("prediction_integrity", {}).get("valid"):
+        return "_Strata omitted: selected prediction inventory has not passed integrity checks._"
     if not prepared_dir:
         return "_dados preparados indisponíveis nesta máquina_"
     from triagebench.analysis.strata import strata_markdown, stratified_test_metrics
     from triagebench.utils.io import atomic_write_parquet
 
     variants = [v for v, vc in cfg["variants"].items() if not vc.get("exclude_non_numeric_pain")]
-    df = stratified_test_metrics(cdir, Path(prepared_dir), variants)
+    try:
+        df = stratified_test_metrics(cdir, Path(prepared_dir), variants, eligible_tasks=_eligible_task_keys(stats))
+    except ValueError as exc:
+        return f"_Strata omitted: {exc}._"
     if not df.empty:
         atomic_write_parquet(df, cdir / "tables" / "strata.parquet")
     return ("Completos = os 6 sinais vitais presentes e dor numérica. Ausência é um forte marcador de acuity 1 "
@@ -130,28 +149,96 @@ def _sensitivity_tables(cfg: dict, metrics: pd.DataFrame, timings: pd.DataFrame,
     return "\n".join(out) if out else "_sem resultados de sensibilidade_"
 
 
-def _importance_section(cdir: Path) -> str:
+def _importance_section(cdir: Path, cfg: dict | None = None, metrics: pd.DataFrame | None = None,
+                        stats: dict | None = None) -> str:
     path = cdir / "tables" / "importance.parquet"
     if not path.exists():
         return "_não executada nesta campanha (`triagebench importance`)_"
-    from triagebench.analysis.importance import importance_markdown
+    from triagebench.analysis.importance import choose_models, importance_markdown
 
-    return importance_markdown(pd.read_parquet(path))
+    df = pd.read_parquet(path)
+    if cfg is not None and metrics is not None:
+        if not _eligible_task_keys(stats) or metrics.empty:
+            return "_Importance omitted: no selected task inventory._"
+        df = _filter_task_rows(df, stats)
+        if df.empty:
+            return "_No importance results for selected tasks._"
+        models = choose_models(metrics, cfg, primary_variant(cfg))
+        df = df.loc[df.model.isin(models)]
+        if "macro_f1_base" not in df:
+            return "_Importance omitted: baseline metric provenance is unavailable._"
+        baseline = metrics.loc[(metrics.split == "test") & (metrics.metric == "macro_f1")]
+        from triagebench.analysis.stats import TASK_COLS
+
+        joined = df.merge(baseline[TASK_COLS + ["value"]], on=TASK_COLS, how="left", validate="many_to_one")
+        if not np.isclose(joined.macro_f1_base, joined.value, rtol=1e-9, atol=1e-12).all():
+            return "_Importance omitted: baseline metrics disagree with the selected analysis._"
+    return importance_markdown(df)
 
 
-def _h1_secondary_section(cfg: dict, metrics: pd.DataFrame, variant: str) -> str:
+def _h1_secondary_section(cfg: dict, metrics: pd.DataFrame, variant: str, seeds: list[int]) -> str:
     if metrics.empty:
         return "_—_"
     from triagebench.analysis.secondary import h1_secondary_markdown, h1_validation_selected_strategy
 
-    return h1_secondary_markdown(h1_validation_selected_strategy(metrics, cfg, variant))
+    return h1_secondary_markdown(h1_validation_selected_strategy(metrics, cfg, variant, seeds=seeds))
 
 
-def _decodings_section(cdir: Path, variant: str, order: list[str]) -> str:
+def _selected_tables(tables: dict, stats: dict | None) -> dict:
+    """Use the exact statistics task inventory and prefix in every performance display."""
+    from triagebench.analysis.stats import TASK_COLS
+
+    seeds = (stats or {}).get("seeds_used", [])
+    tasks = (stats or {}).get("meta", {}).get("eligible_tasks", [])
+    eligible = {tuple(task[k] for k in TASK_COLS) for task in tasks if task["seed"] in seeds}
+    selected = {}
+    for name, frame in tables.items():
+        if set(TASK_COLS) <= set(frame.columns):
+            keep = [key in eligible for key in frame[TASK_COLS].itertuples(index=False, name=None)]
+            selected[name] = frame.loc[keep].copy()
+        elif "seed" in frame.columns:
+            selected[name] = frame.loc[frame.seed.isin(seeds)].copy()
+        else:
+            selected[name] = frame.iloc[:0].copy()
+    if not selected["metrics"].empty:
+        metric_keys = TASK_COLS + ["split", "metric"]
+        frame = selected["metrics"].drop_duplicates(metric_keys, keep="last").copy()
+        frame["value"] = pd.to_numeric(frame["value"], errors="coerce")
+        frame.loc[~np.isfinite(frame["value"]), "value"] = np.nan
+        selected["metrics"] = frame
+    return selected
+
+
+def _eligible_tasks(stats: dict | None) -> list[dict]:
+    seeds = (stats or {}).get("seeds_used", [])
+    return [task for task in (stats or {}).get("meta", {}).get("eligible_tasks", []) if task["seed"] in seeds]
+
+
+def _eligible_task_keys(stats: dict | None) -> set[tuple]:
+    from triagebench.analysis.stats import TASK_COLS
+
+    return {tuple(task[k] for k in TASK_COLS) for task in _eligible_tasks(stats)}
+
+
+def _filter_task_rows(frame: pd.DataFrame, stats: dict | None) -> pd.DataFrame:
+    from triagebench.analysis.stats import TASK_COLS
+
+    if not set(TASK_COLS) <= set(frame):
+        return frame.iloc[:0].copy()
+    eligible = _eligible_task_keys(stats)
+    return frame.loc[[key in eligible for key in frame[TASK_COLS].itertuples(index=False, name=None)]].copy()
+
+
+def _decodings_section(cdir: Path, variant: str, order: list[str], stats: dict | None = None) -> str:
+    if not (stats or {}).get("prediction_integrity", {}).get("valid"):
+        return "_Alternative decodings omitted: selected predictions have not passed integrity checks._"
     from triagebench.analysis.secondary import decodings, decodings_markdown
     from triagebench.utils.io import atomic_write_parquet
 
-    df = decodings(cdir, variant)
+    try:
+        df = decodings(cdir, variant, eligible_tasks=_eligible_task_keys(stats))
+    except ValueError as exc:
+        return f"_Alternative decodings omitted: {exc}._"
     if not df.empty:
         atomic_write_parquet(df, cdir / "tables" / "decodings.parquet")
     return decodings_markdown(df, order)
@@ -186,7 +273,11 @@ def write_reports(cfg: dict, cdir: Path, tables: dict, stats: dict | None, prepa
     variant = primary_variant(cfg)
     order = all_models(cfg)
     strategies = list(cfg["imbalance"]["strategies"])
+    execution_tables = tables
+    tables = _selected_tables(tables, stats)
     metrics = tables["metrics"]
+    seeds = (stats or {}).get("seeds_used", [])
+    status = (stats or {}).get("meta", {}).get("analysis_status", "unverified")
 
     if prepared_dir and (Path(prepared_dir) / "data_preparation.md").exists():
         out.mkdir(parents=True, exist_ok=True)
@@ -207,7 +298,7 @@ def write_reports(cfg: dict, cdir: Path, tables: dict, stats: dict | None, prepa
             conf = tables["confusion"]
             c = conf[(conf.variant == variant) & (conf.split == "test") & (conf.strategy == "none") & (conf.model == best)]
             cm = c.groupby(["true", "pred"])["count"].sum().unstack(fill_value=0).reindex(index=range(1, 6), columns=range(1, 6), fill_value=0)
-            figs.append(figures.fig_confusion(cm.to_numpy(), f"{best} (best primary by mean VALIDATION macro-F1), test, all seeds",
+            figs.append(figures.fig_confusion(cm.to_numpy(), f"{best} (best primary by mean VALIDATION macro-F1), test, selected seeds",
                                               figdir / "confusion_best_primary.png", k))
     figs = [f for f in figs if f is not None]
 
@@ -216,6 +307,9 @@ def write_reports(cfg: dict, cdir: Path, tables: dict, stats: dict | None, prepa
     hosts = {s["environment"]["hardware"]["hostname"] for s in sessions if s.get("environment")}
     seeds_done = sorted(metrics.seed.unique().tolist()) if not metrics.empty else []
     lines = [
+        f"**Analysis status: {status}.** Selected seeds: {', '.join(map(str, seeds)) or 'none'}. "
+        "Principal analysis is unavailable until immutable cutoff completeness provenance is verified.",
+        "",
         f"# Resumo da campanha `{meta['campaign_id']}`",
         "",
         f"> Gerado automaticamente em {utc_now()} por `triagebench analyze`. Só agregados; contagens de 1 a {k - 1} "
@@ -228,9 +322,9 @@ def write_reports(cfg: dict, cdir: Path, tables: dict, stats: dict | None, prepa
             ["dados preparados", f"`{meta['prepared_id']}` (ver `data_preparation.md`)"],
             ["commits", ", ".join(sorted(g for g in git if g)) or "?"], ["máquinas", ", ".join(sorted(hosts)) or "?"],
             ["sessões", len(sessions)], ["seeds com resultado", ", ".join(map(str, seeds_done)) or "—"],
-            ["tarefas concluídas", len(tables["timings"])], ["tarefas com falha", len(tables["failures"])],
-            ["combinações não aplicáveis", len(tables["not_applicable"])],
-            ["horas de tarefa (soma)", f"{tables['timings'].task_seconds.sum() / 3600:.1f}" if not tables["timings"].empty else "0"],
+            ["tarefas concluídas", len(execution_tables["timings"])], ["tarefas com falha", len(execution_tables["failures"])],
+            ["combinações não aplicáveis", len(execution_tables["not_applicable"])],
+            ["horas de tarefa (soma)", f"{execution_tables['timings'].task_seconds.sum() / 3600:.1f}" if not execution_tables["timings"].empty else "0"],
         ]),
         "",
         f"## Desempenho no teste — variante principal `{variant}` (média ± DP entre seeds)",
@@ -245,13 +339,13 @@ def write_reports(cfg: dict, cdir: Path, tables: dict, stats: dict | None, prepa
         "",
         "## Estratos do teste: sinais completos × incompletos (pré-registrado em 05/11)",
         "",
-        _strata_section(cfg, cdir, prepared_dir, order, k),
+        _strata_section(cfg, cdir, prepared_dir, order, k, stats),
         "",
         "## Variantes de sensibilidade (cada uma no seu próprio teste; B não é comparável diretamente com A)",
         "",
         _sensitivity_tables(cfg, metrics, tables["timings"], order),
         "",
-        "## Distância ordinal dos acertos/erros (teste, estratégia none, todas as seeds)",
+        "## Distância ordinal dos acertos/erros (teste, estratégia none, seeds selecionadas)",
         "",
         _error_distance_table(tables["abs_error"], variant, order, k) if not tables["abs_error"].empty else "_—_",
         "",
@@ -261,15 +355,15 @@ def write_reports(cfg: dict, cdir: Path, tables: dict, stats: dict | None, prepa
 
         lines += ["## Análise pré-registrada", "", render_stats_markdown(stats), ""]
     lines += ["## Importância das variáveis por permutação agrupada (F5, teste, modelos escolhidos na validação)", "",
-              _importance_section(cdir), "",
+              _importance_section(cdir, cfg, metrics, stats), "",
               "## Análises secundárias pré-registradas em 05/11 (descritivas)", "",
               "### H1 com a estratégia escolhida na validação", "",
-              _h1_secondary_section(cfg, metrics, variant), "",
+              _h1_secondary_section(cfg, metrics, variant, seeds), "",
               "### Decodificações alternativas a partir das probabilidades salvas (teste, média entre seeds)", "",
-              _decodings_section(cdir, variant, order), "",
-              "## Custo computacional", "", _cost_table(cdir), "",
+              _decodings_section(cdir, variant, order, stats), "",
+              "## Custo computacional", "", _cost_table(cdir, cfg, stats), "",
               "## Busca de hiperparâmetros", "", _hpo_table(tables["hpo_trials"], order), "",
-              "## Alertas e anomalias", "", _anomalies_md(tables, stats, variant), "",
+              "## Alertas e anomalias", "", _anomalies_md(execution_tables, stats, variant), "",
               "## Figuras", ""] + [f"- `figures/{Path(f).name}`" for f in figs] + [""]
     path = atomic_write_text(out / "summary.md", "\n".join(lines))
     if cfg["campaign"]["tag"] == "main":

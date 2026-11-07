@@ -15,7 +15,9 @@ files.  Conventions:
 from __future__ import annotations
 
 import copy
+import hashlib
 import math
+from datetime import UTC, datetime
 from itertools import combinations
 from typing import Any
 
@@ -31,6 +33,7 @@ SMALL_LABEL = "<11"
 DEFAULT_CFG: dict[str, Any] = {
     "variant_main": "A_keep_encode",
     "variant_sens": "B_pain_numeric_only",
+    "variant_ablation": "C_values_only",
     "strategies": ["none", "class_weight", "oversample"],
     # (model, strategy) pairs that do not exist by design (NOT failures)
     "not_applicable": [["knn", "class_weight"]],
@@ -54,6 +57,64 @@ REQUIRED_METRIC_COLS = ["variant", "seed", "model", "strategy", "split", "metric
 REQUIRED_PRED_COLS = [
     "variant", "seed", "model", "strategy", "stay_id", "subject_id", "partition", "y_true", "y_pred",
 ]  # fmt: skip
+
+# Registered calendar deadline, 2026-11-10 12:00 BRT. Never a performance threshold.
+PRINCIPAL_CUTOFF = "2026-11-10T15:00:00+00:00"
+TASK_COLS = ["variant", "seed", "model", "strategy"]
+
+
+def _utc_timestamp(value: Any) -> pd.Timestamp:
+    """Require an explicit timezone so a replay cannot depend on the machine timezone."""
+    stamp = pd.Timestamp(value)
+    if pd.isna(stamp) or stamp.tzinfo is None:
+        raise ValueError("analysis_time must be a timezone-aware timestamp")
+    return stamp.tz_convert("UTC")
+
+
+def _time_eligibility(metrics: pd.DataFrame, analysis_time: Any) -> tuple[pd.DataFrame, dict]:
+    """Filter known late tasks and disclose the remaining historical-provenance gap.
+
+    A producer's finished_at is useful evidence, but a mutable current aggregate cannot
+    prove which task/result inventory existed at the cutoff. Until an immutable cutoff
+    snapshot is implemented, post-cutoff analysis is deliberately blocked as principal.
+    """
+    as_of = _utc_timestamp(analysis_time if analysis_time is not None else datetime.now(UTC))
+    cutoff = pd.Timestamp(PRINCIPAL_CUTOFF)
+    boundary = min(as_of, cutoff)
+    def producer_time(value):
+        try:
+            return _utc_timestamp(value)
+        except (ValueError, TypeError):
+            return pd.NaT
+
+    finished = (pd.to_datetime(metrics["finished_at"].map(producer_time), utc=True)
+                if "finished_at" in metrics else pd.Series(pd.NaT, index=metrics.index, dtype="datetime64[ns, UTC]"))
+    # One task cannot have multiple completion times across metrics/splits.
+    task_times = metrics[TASK_COLS].copy()
+    task_times["finished_at"] = finished
+    inconsistent = task_times.groupby(TASK_COLS, dropna=False).finished_at.transform(
+        lambda x: x.nunique(dropna=False) > 1).astype(bool)
+    late = finished.notna() & (finished > boundary)
+    eligible = metrics.loc[~late & ~inconsistent].copy()
+    inventory = task_times.drop_duplicates().sort_values(TASK_COLS)
+    fingerprint = hashlib.sha256(inventory.to_csv(index=False).encode("utf-8")).hexdigest()
+    tasks = eligible[TASK_COLS].drop_duplicates().sort_values(TASK_COLS).to_dict("records")
+    preview = as_of < cutoff
+    return eligible, {
+        "schema_version": 2,
+        "analysis_time_utc": as_of.isoformat(), "principal_cutoff_utc": cutoff.isoformat(),
+        "eligibility_boundary_utc": boundary.isoformat(),
+        "analysis_status": "technical_preview" if preview else "pending_cutoff_provenance",
+        "principal_analysis": False, "cutoff_provenance_verified": False,
+        "cutoff_provenance_requirement": "Immutable task/result inventory at the registered cutoff is not available; producer timestamps alone do not prove historical completeness.",
+        "completion_time_source": "producer result.finished_at (when available)",
+        "completion_inventory_sha256": fingerprint,
+        "tasks_missing_completion_time": int(task_times.loc[finished.isna(), TASK_COLS].drop_duplicates().shape[0]),
+        "tasks_excluded_after_boundary": int(task_times.loc[late, TASK_COLS].drop_duplicates().shape[0]),
+        "tasks_excluded_inconsistent_completion_time": int(task_times.loc[inconsistent, TASK_COLS].drop_duplicates().shape[0]),
+        "eligible_tasks": tasks,
+        "excluded_tasks": task_times.loc[late | inconsistent, TASK_COLS].drop_duplicates().to_dict("records"),
+    }
 
 LOW_POWER_WARNING = (
     "Poder baixo: Friedman/Nemenyi usam as seeds como blocos, mas os holdouts se sobrepõem "
@@ -377,6 +438,84 @@ class _Preds:
         return {k: v[ix] for k, v in self.cols.items()}
 
 
+def _prediction_integrity(predictions: pd.DataFrame, metrics: pd.DataFrame, cfg: dict,
+                          seeds: list[int]) -> tuple[pd.DataFrame | None, dict]:
+    """Fail closed before prediction-derived inference; never repair or intersect bad tasks.
+
+    Diagnostics identify task cells only. Stay/patient identifiers never leave this function.
+    All supplied scalar test metrics with a producer definition are checked, including n.
+    """
+    from triagebench.evaluation.metrics import compute_metrics
+
+    anomalies: list[dict] = []
+    report = {"checked": True, "valid": False, "anomalies": anomalies,
+              "policy": "Any integrity anomaly omits prediction-derived sections; no silent reconciliation."}
+    missing = [c for c in REQUIRED_PRED_COLS if c not in predictions]
+    if missing:
+        anomalies.append({"type": "prediction_schema", "columns": missing})
+        return None, report
+    p = predictions.loc[predictions["partition"].astype(str).eq("test") & predictions.seed.isin(seeds)].copy()
+    expected = metrics.loc[metrics.seed.isin(seeds) & metrics.split.eq("test") &
+                           metrics.metric.eq("macro_f1") & np.isfinite(metrics.value), TASK_COLS].drop_duplicates()
+    expected_keys = {tuple(row) for row in expected.itertuples(index=False, name=None)}
+    seen: set[tuple] = set()
+    universes: dict[tuple, pd.DataFrame] = {}
+    for key, sub in p.groupby(TASK_COLS, observed=True, sort=False):
+        cell = dict(zip(TASK_COLS, key, strict=True))
+        seen.add(key)
+        if key not in expected_keys:
+            anomalies.append({"type": "predictions_without_metrics", **cell})
+            continue
+        if sub.stay_id.isna().any() or sub.subject_id.isna().any() or sub.stay_id.duplicated().any():
+            anomalies.append({"type": "prediction_duplicate_or_missing_identifiers", **cell})
+            continue
+        invalid = False
+        for col in ("stay_id", "subject_id", "y_true", "y_pred"):
+            numeric = pd.to_numeric(sub[col], errors="coerce")
+            if not (np.isfinite(numeric) & numeric.eq(np.floor(numeric))).all():
+                invalid = True
+            if col in ("y_true", "y_pred") and not numeric.between(1, 5).all():
+                invalid = True
+        if invalid:
+            anomalies.append({"type": "prediction_invalid_labels_or_identifiers", **cell})
+            continue
+        recomputed = compute_metrics(sub.y_true, sub.y_pred)
+        stored = metrics.loc[(metrics[TASK_COLS] == pd.Series(cell)).all(axis=1) & metrics.split.eq("test")]
+        bad_metrics = []
+        for metric, rows in stored.groupby("metric", sort=False):
+            if metric not in recomputed or not np.isscalar(recomputed[metric]):
+                continue
+            supplied = float(rows.value.iloc[-1])
+            actual = float(recomputed[metric])
+            if not np.isclose(supplied, actual, rtol=1e-9, atol=1e-12, equal_nan=True):
+                bad_metrics.append(str(metric))
+        if bad_metrics:
+            anomalies.append({"type": "metrics_predictions_mismatch", **cell, "metrics": bad_metrics})
+        universe = sub.set_index("stay_id")[["subject_id", "y_true"]].sort_index()
+        universe_key = (key[0], key[1])
+        reference = universes.setdefault(universe_key, universe)
+        if not universe.equals(reference):
+            anomalies.append({"type": "prediction_incompatible_test_universe", **cell})
+    for key in sorted(expected_keys - seen):
+        anomalies.append({"type": "predictions_missing_task", **dict(zip(TASK_COLS, key, strict=True))})
+    for seed in seeds:
+        main = universes.get((cfg["variant_main"], seed))
+        if main is None:
+            continue
+        for variant in (cfg["variant_sens"], cfg["variant_ablation"]):
+            other = universes.get((variant, seed))
+            if other is None:
+                continue
+            # B is nested in A; C must preserve exactly A's stays and labels.
+            common = main.index.intersection(other.index)
+            nested = len(common) == len(other)
+            same = other.loc[common].equals(main.loc[common])
+            if not nested or not same or (variant == cfg["variant_ablation"] and len(other) != len(main)):
+                anomalies.append({"type": "prediction_incompatible_variant_universe", "variant": variant, "seed": seed})
+    report["valid"] = not anomalies
+    return (p if not anomalies else None), report
+
+
 # --------------------------------------------------------------------------------------
 # plan pieces
 # --------------------------------------------------------------------------------------
@@ -557,7 +696,8 @@ def _h2(store: _Store, cfg: dict, seeds: list[int]) -> dict[str, Any]:
             "rule": "suportada se as 3 métricas têm diferença média > 0 e p_Holm < alpha (inter-união)"}  # fmt: skip
 
 
-H3_METRICS = ["under_triage_rate", "over_triage_rate", "severe_under_triage_rate", "adjacent_error_share"]
+H3_METRICS = ["under_triage_rate", "over_triage_rate", "severe_under_triage_rate", "adjacent_error_share",
+              "under_triage_rate_urgent"]
 
 
 def _h3(store: _Store, cfg: dict, seeds: list[int]) -> dict[str, Any]:
@@ -575,6 +715,7 @@ def _h3(store: _Store, cfg: dict, seeds: list[int]) -> dict[str, Any]:
                 vals[metric] = x
                 r[metric] = float(x.mean()) if len(x) else None
                 r[metric + "_sd"] = float(x.std(ddof=1)) if len(x) > 1 else None
+                r[metric + "_n_seeds"] = int(len(x))
             adj = vals["adjacent_error_share"]
             r["distant_error_share"] = (1.0 - r["adjacent_error_share"]) if r["adjacent_error_share"] is not None else None
             r["adjacent_majority_all_seeds"] = bool(len(adj) > 0 and np.all(adj > 0.5))
@@ -584,6 +725,29 @@ def _h3(store: _Store, cfg: dict, seeds: list[int]) -> dict[str, Any]:
     return {"variant": v, "rows": rows,
             "n_models_adjacent_majority": sum(r["adjacent_majority_all_seeds"] for r in cand),
             "n_models_evaluated": len(cand)}  # fmt: skip
+
+
+def _ablation_a_minus_c(store: _Store, cfg: dict, seeds: list[int]) -> dict:
+    """Registered 05/11 descriptive contrast, on the selected A prefix only."""
+    va, vc = cfg["variant_main"], cfg["variant_ablation"]
+    rows = []
+    for model in _models_present(store, cfg, va, ("primary", "extra", "reference")):
+        pairs, missing = [], []
+        for seed in seeds:
+            a = store.value(va, model, "none", "test", "macro_f1", seed)
+            c = store.value(vc, model, "none", "test", "macro_f1", seed)
+            if _fin(a) and _fin(c):
+                pairs.append({"seed": seed, "a": a, "c": c, "diff_a_minus_c": a - c})
+            else:
+                missing.append({"seed": seed, "missing_variants": [v for v, x in ((va, a), (vc, c)) if not _fin(x)]})
+        corr = corrected_resampled_ttest([p["diff_a_minus_c"] for p in pairs],
+                                        cfg["train_frac"], cfg["test_frac"], cfg["alpha"])
+        rows.append({"model": model, "n_pairs": len(pairs), "paired_seeds": [p["seed"] for p in pairs],
+                     "missing_pairs": missing, "per_seed": pairs, "mean_diff_a_minus_c": corr["mean"],
+                     "ci_low": corr["ci_low"], "ci_high": corr["ci_high"], "p": corr["p"], "dz": corr["dz"]})
+    return {"variant_a": va, "variant_c": vc, "strategy": "none", "metric": "macro_f1",
+            "role": "descriptive", "multiplicity_correction": None, "rows": rows,
+            "available": any(r["n_pairs"] for r in rows)}
 
 
 def _ranking(store: _Store, cfg: dict, seeds: list[int], notes: list[str]) -> dict[str, Any]:
@@ -782,6 +946,8 @@ def _anomalies(store: _Store, cfg: dict, seeds: list[int], variants: list[str]) 
             continue
         for m in _primary(cfg) + list(cfg["extra_models"]) + list(cfg["reference_models"]):
             for st in cfg["strategies"]:
+                if v == cfg["variant_ablation"] and st != "none":
+                    continue
                 if _is_na(cfg, m, st):
                     continue
                 miss = {}
@@ -845,6 +1011,7 @@ def run_preregistered_analysis(
     delta: float = 0.01,
     n_boot: int = 1000,
     seed: int = 0,
+    analysis_time: Any = None,
 ) -> dict:
     """Run the pre-registered analysis (see ``docs/analysis_plan.md``).
 
@@ -858,11 +1025,17 @@ def run_preregistered_analysis(
     miss = [c for c in REQUIRED_METRIC_COLS if c not in metrics.columns]
     if miss:
         raise ValueError(f"metrics sem colunas obrigatórias: {miss}")
-    m = metrics[REQUIRED_METRIC_COLS + [c for c in ("model_kind", "model_group") if c in metrics.columns]].copy()
+    m = metrics[REQUIRED_METRIC_COLS + [c for c in ("model_kind", "model_group", "finished_at") if c in metrics.columns]].copy()
     m["seed"] = m["seed"].astype(int)
     m["value"] = pd.to_numeric(m["value"], errors="coerce")
     for c in ("variant", "model", "strategy", "split", "metric"):
         m[c] = m[c].astype(str)
+    m, time_meta = _time_eligibility(m, analysis_time)
+    notes.append(f"Analysis status: {time_meta['analysis_status']}; principal designation is blocked without immutable cutoff provenance.")
+    if time_meta["tasks_missing_completion_time"]:
+        notes.append("Producer completion timestamps are missing/invalid; undated tasks may appear in a technical preview only.")
+    if time_meta["tasks_excluded_after_boundary"] or time_meta["tasks_excluded_inconsistent_completion_time"]:
+        notes.append("Tasks with completion after the as-of/cutoff boundary or inconsistent completion timestamps were excluded.")
     store = _Store(m)
     if store.n_duplicates:
         notes.append(f"{store.n_duplicates} linhas duplicadas em (variant, model, strategy, split, metric, seed): mantida a última.")
@@ -873,9 +1046,10 @@ def run_preregistered_analysis(
         "meta": {"delta": delta, "n_boot": n_boot, "bootstrap_seed": seed, "alpha": cfg["alpha"],
                  "variant_main": cfg["variant_main"], "variant_sens": cfg["variant_sens"],
                  "train_frac": cfg["train_frac"], "test_frac": cfg["test_frac"],
-                 "predictions_available": predictions is not None},
+                 "predictions_available": predictions is not None, **time_meta},
         "seeds_used": [], "seed_selection": {}, "h1": {}, "h2": {}, "h3": {}, "ranking": {},
         "sensitivity_b_vs_a": {}, "bootstrap_ci": {}, "anomalies": [], "notes": notes,
+        "ablation_a_minus_c": {}, "prediction_integrity": {"checked": False, "valid": False},
     }  # fmt: skip
 
     def guarded(name: str, fn):
@@ -885,13 +1059,17 @@ def run_preregistered_analysis(
             notes.append(f"ERRO na seção '{name}': {type(exc).__name__}: {exc}")
             return {}
 
-    variants = [cfg["variant_main"], cfg["variant_sens"]]
+    variants = [cfg["variant_main"], cfg["variant_sens"], cfg["variant_ablation"]]
     sel = select_seeds(store, cfg) if cfg["variant_main"] in store.variants else None
     if sel is None:
         notes.append(f"Variante principal {cfg['variant_main']} ausente: análise principal não executada.")
         results["anomalies"] = []
         return _clean(results)
     seeds = sel["used"]
+    if time_meta["analysis_status"] == "pending_cutoff_provenance":
+        sel["candidate_preview_prefix"] = seeds
+        sel["used"] = seeds = []
+        sel["rule"] = "Principal analysis blocked: immutable cutoff inventory/completeness provenance is unavailable."
     results["seeds_used"] = seeds
     results["seed_selection"] = sel
     extra_seeds = sorted({int(s) for s in m["seed"].unique()} - set(seeds))
@@ -902,6 +1080,7 @@ def run_preregistered_analysis(
         notes.append(f"Análise com {len(seeds)} < {cfg['expected_seeds']} seeds: poder e precisão do IC reduzidos.")
     results["anomalies"] = guarded("anomalias", lambda: _anomalies(store, cfg, seeds, variants)) or []
     n_ref = store.get(cfg["variant_main"], "logreg", "none", "test", "n")
+    n_ref = n_ref.reindex(seeds).dropna()
     if len(n_ref):
         results["meta"]["n_test_stays_mean"] = _mask_value(float(np.nanmean(n_ref.to_numpy())))
     if not seeds:
@@ -920,13 +1099,27 @@ def run_preregistered_analysis(
     results["h2"] = guarded("h2", lambda: _h2(store, cfg, seeds))
     results["h3"] = guarded("h3", lambda: _h3(store, cfg, seeds))
     results["ranking"] = guarded("ranking", lambda: _ranking(store, cfg, seeds, notes))
+    results["ablation_a_minus_c"] = guarded("ablation_a_minus_c", lambda: _ablation_a_minus_c(store, cfg, seeds))
     preds = None
     if predictions is not None:
-        pm = [c for c in REQUIRED_PRED_COLS if c not in predictions.columns]
-        if pm:
-            notes.append(f"`predictions` sem colunas {pm}: bootstrap e sensibilidade não executados.")
-        else:
-            preds = _Preds(predictions)
+        candidate_predictions = predictions
+        excluded = time_meta["excluded_tasks"]
+        if excluded and set(TASK_COLS) <= set(predictions.columns):
+            excluded_keys = {tuple(task[k] for k in TASK_COLS) for task in excluded}
+            keys = predictions[TASK_COLS].itertuples(index=False, name=None)
+            candidate_predictions = predictions.loc[[key not in excluded_keys for key in keys]]
+        try:
+            checked, integrity = _prediction_integrity(candidate_predictions, m, cfg, seeds)
+            if checked is not None:
+                preds = _Preds(checked)
+        except Exception as exc:  # noqa: BLE001 - fail closed, never expose patient identifiers
+            integrity = {"checked": True, "valid": False, "anomalies": [
+                {"type": "prediction_integrity_error", "error_type": type(exc).__name__}]}
+            checked = None
+        results["prediction_integrity"] = integrity
+        results["anomalies"].extend(integrity["anomalies"])
+        if checked is None:
+            notes.append("Prediction integrity failed: bootstrap and common-subset sensitivity omitted; see anomalies.")
     else:
         notes.append("Sem `predictions`: IC por bootstrap de pacientes e comparação B vs A no subconjunto comum não executados.")
     results["sensitivity_b_vs_a"] = guarded("sensibilidade", lambda: _sensitivity(preds, store, cfg, seeds, results["h1"], delta, notes))
@@ -971,6 +1164,10 @@ def render_stats_markdown(results: dict) -> str:
     """Markdown tables (pt-BR) for ``summary.md``.  Counts of 1..10 are masked as '<11'."""
     L: list[str] = ["## Análise estatística pré-registrada\n"]
     meta = results.get("meta", {})
+    L.append(f"**Analysis status: {meta.get('analysis_status', 'unverified')}**; "
+             f"as of {meta.get('analysis_time_utc', 'unavailable')}; "
+             f"registered cutoff {meta.get('principal_cutoff_utc', PRINCIPAL_CUTOFF)}. "
+             "Principal analysis is blocked until immutable cutoff completeness provenance is verified.\n")
     seeds = results.get("seeds_used", [])
     sel = results.get("seed_selection", {})
     L.append("### Seeds utilizadas\n")
@@ -1024,6 +1221,12 @@ def render_stats_markdown(results: dict) -> str:
                           "sim" if r["adjacent_majority_all_seeds"] else "não"] for r in h3.get("rows", [])]))  # fmt: skip
 
     rk = results.get("ranking") or {}
+    if h3:
+        L.append("### Urgent undertriage (descriptive; recorded acuity <= 2)\n")
+        L.append(_table(["Model", "Strategy", "Mean", "SD", "Available seeds"],
+                        [[r["model"], r["strategy"], _f(r.get("under_triage_rate_urgent")),
+                          _f(r.get("under_triage_rate_urgent_sd")), str(r.get("under_triage_rate_urgent_n_seeds", 0))]
+                         for r in h3.get("rows", [])]))
     L.append("### Ranking descritivo (Friedman com seeds como blocos, Nemenyi)\n")
     if rk:
         L.append(f"_{rk.get('warning', '')}_\n")
@@ -1057,6 +1260,15 @@ def render_stats_markdown(results: dict) -> str:
         L.append("_Comparação no subconjunto comum não disponível (ver notas)._\n")
 
     bs = results.get("bootstrap_ci") or {}
+    ac = results.get("ablation_a_minus_c") or {}
+    L.append("### A minus C ablation (descriptive, paired by seed, no multiplicity correction)\n")
+    if ac:
+        L.append(_table(["Model", "Pairs", "Paired seeds", "Missing pairs (seed: variant)",
+                         "Mean A-C", "95% corrected t CI", "p (descriptive)", "dz"],
+                        [[r["model"], str(r["n_pairs"]), ", ".join(map(str, r["paired_seeds"])),
+                          "; ".join(f"{p['seed']}: {', '.join(p['missing_variants'])}" for p in r["missing_pairs"]),
+                          _f(r["mean_diff_a_minus_c"], 4, True), _ci(r["ci_low"], r["ci_high"]),
+                          _p(r["p"]), _f(r["dz"], 2)] for r in ac.get("rows", [])]))
     L.append("### IC por bootstrap de pacientes (Macro-F1 de teste, estratégia none, variante A)\n")
     if bs:
         L.append(f"B = {bs['n_boot']} reamostragens; {bs['interpretation']}\n")

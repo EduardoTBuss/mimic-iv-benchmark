@@ -18,6 +18,11 @@ EXTRA = ["hgb", "extratrees", "ordinal_logit"]
 VA, VB = "A_keep_encode", "B_pain_numeric_only"
 
 
+def analyze(*args, **kwargs):
+    """Synthetic legacy cases are technical previews at a fixed pre-cutoff instant."""
+    return S.run_preregistered_analysis(*args, analysis_time="2026-11-06T15:00:00+00:00", **kwargs)
+
+
 def make_metrics(complex_boost=0.05, noise=0.003, seeds=range(1, 11), models_skip=(), variants=(VA,), seed=0):
     """Long metrics table.  Seed-level shared shocks mimic overlapping holdouts."""
     rng = np.random.default_rng(seed)
@@ -76,6 +81,25 @@ def make_predictions(seeds=(1, 2, 3), n_patients=400, rare_class_1=6, seed=0):
     return pd.concat(rows, ignore_index=True)
 
 
+def coherent_analysis_inputs():
+    """Match the saved test metrics/inventory to predictions for end-to-end analysis tests."""
+    from triagebench.evaluation.metrics import compute_metrics, scalar_metrics
+
+    preds = make_predictions(seeds=(1, 2, 3, 4, 5), rare_class_1=6)
+    preds = pd.concat([preds.assign(strategy=strategy) for strategy in ("none", "class_weight", "oversample")],
+                      ignore_index=True)
+    preds = preds.loc[~((preds.model == "knn") & (preds.strategy == "class_weight"))]
+    metrics = make_metrics(seeds=(1, 2, 3, 4, 5), variants=(VA, VB))
+    # Descriptive extras/dummies have no predictions in this fixture, so remove them explicitly.
+    metrics = metrics.loc[metrics.model.isin(SIMPLE + COMPLEX)].copy()
+    for (variant, seed, model, strategy), sub in preds.groupby(["variant", "seed", "model", "strategy"]):
+        recomputed = scalar_metrics(compute_metrics(sub.y_true, sub.y_pred))
+        cell = ((metrics.variant == variant) & (metrics.seed == seed) & (metrics.model == model) &
+                (metrics.strategy == strategy) & (metrics.split == "test"))
+        metrics.loc[cell, "value"] = metrics.loc[cell, "metric"].map(recomputed)
+    return metrics, preds
+
+
 # ------------------------------------------------------------------ (a) metrics vs sklearn
 @pytest.mark.parametrize("seed", range(5))
 def test_metrics_from_confusion_matches_sklearn(seed):
@@ -101,7 +125,7 @@ def test_metrics_from_confusion_batched_equals_loop():
 
 # ------------------------------------------------------------------ (b) H1 scenarios
 def test_h1_consistent_when_complex_clearly_better():
-    r = S.run_preregistered_analysis(make_metrics(complex_boost=0.05), None, n_boot=0)
+    r = analyze(make_metrics(complex_boost=0.05), None, n_boot=0)
     assert r["seeds_used"] == list(range(1, 11))
     assert r["h1"]["verdict"] == "consistente"
     assert r["h1"]["all_positive"] and r["h1"]["ci_lower_gt_delta"]
@@ -110,12 +134,12 @@ def test_h1_consistent_when_complex_clearly_better():
 
 
 def test_h1_not_consistent_when_tie():
-    r = S.run_preregistered_analysis(make_metrics(complex_boost=0.0, noise=0.004), None, n_boot=0)
+    r = analyze(make_metrics(complex_boost=0.0, noise=0.004), None, n_boot=0)
     assert r["h1"]["verdict"] == "sem_superioridade_consistente"
 
 
 def test_h1_small_effect_below_delta_is_not_consistent():
-    r = S.run_preregistered_analysis(make_metrics(complex_boost=-0.004, noise=0.001), None, n_boot=0)
+    r = analyze(make_metrics(complex_boost=-0.004, noise=0.001), None, n_boot=0)
     assert r["h1"]["verdict"] == "sem_superioridade_consistente"
     assert not r["h1"]["ci_lower_gt_delta"]
 
@@ -123,11 +147,11 @@ def test_h1_small_effect_below_delta_is_not_consistent():
 def test_h1_selection_uses_validation_not_test():
     """Making a model terrible on TEST only must not change which model is selected."""
     m = make_metrics(complex_boost=0.05)
-    r0 = S.run_preregistered_analysis(m, None, n_boot=0)
+    r0 = analyze(m, None, n_boot=0)
     m2 = m.copy()
     mask = (m2.model == "xgb") & (m2.split == "test") & (m2.metric == "macro_f1") & (m2.strategy == "none")
     m2.loc[mask, "value"] = 0.0
-    r1 = S.run_preregistered_analysis(m2, None, n_boot=0)
+    r1 = analyze(m2, None, n_boot=0)
     sel0 = [x["complex_model"] for x in r0["h1"]["per_seed"]]
     sel1 = [x["complex_model"] for x in r1["h1"]["per_seed"]]
     assert sel0 == sel1
@@ -191,14 +215,13 @@ def test_patient_confusions_sum_equals_pooled():
 
 
 def test_full_pipeline_with_predictions_runs_bootstrap_and_sensitivity():
-    metrics = make_metrics(seeds=(1, 2, 3, 4, 5), variants=(VA, VB))
-    preds = make_predictions(seeds=(1, 2, 3, 4, 5))
-    r = S.run_preregistered_analysis(metrics, preds, n_boot=100, seed=3)
+    metrics, preds = coherent_analysis_inputs()
+    r = analyze(metrics, preds, n_boot=100, seed=3)
     assert r["bootstrap_ci"]["summary"]["h1_n_seeds"] == 5
     assert r["sensitivity_b_vs_a"]["available"]
     # nested subset: B-common metrics are computed on the intersection only
     assert r["sensitivity_b_vs_a"]["rows"]
-    again = S.run_preregistered_analysis(metrics, preds, n_boot=100, seed=3)
+    again = analyze(metrics, preds, n_boot=100, seed=3)
     assert again["bootstrap_ci"] == r["bootstrap_ci"]
     assert not any(n.startswith("ERRO") for n in r["notes"])
 
@@ -208,14 +231,14 @@ def test_seed_cut_rule_uses_largest_complete_prefix():
     m = make_metrics()
     # seed 8 loses a primary model on test -> prefix is 1..7
     m = m[~((m.seed == 8) & (m.model == "rf") & (m.strategy == "oversample") & (m.split == "test"))]
-    r = S.run_preregistered_analysis(m, None, n_boot=0)
+    r = analyze(m, None, n_boot=0)
     assert r["seeds_used"] == list(range(1, 8))
     assert any(a["type"] == "ausente_ou_falha" and a["model"] == "rf" for a in r["anomalies"])
 
 
 def test_too_few_seeds_skips_main_analysis_without_error():
     m = make_metrics(seeds=range(1, 4))
-    r = S.run_preregistered_analysis(m, None, n_boot=0)
+    r = analyze(m, None, n_boot=0)
     assert r["seeds_used"] == []
     assert r["h1"] == {}
     assert S.render_stats_markdown(r)
@@ -224,7 +247,7 @@ def test_too_few_seeds_skips_main_analysis_without_error():
 def test_failed_extra_and_missing_knn_class_weight_do_not_break():
     m = make_metrics()
     m = m[~((m.model == "hgb") & (m.seed.isin([2, 3])))]  # failed extra model
-    r = S.run_preregistered_analysis(m, None, n_boot=0)
+    r = analyze(m, None, n_boot=0)
     assert r["seeds_used"] == list(range(1, 11))
     assert any(a["model"] == "hgb" for a in r["anomalies"])
     assert not any(a["model"] == "knn" and a["strategy"] == "class_weight" for a in r["anomalies"])  # N/A, not failure
@@ -234,7 +257,7 @@ def test_failed_extra_and_missing_knn_class_weight_do_not_break():
 
 
 def test_missing_predictions_and_variant_b_noted():
-    r = S.run_preregistered_analysis(make_metrics(), None, n_boot=50)
+    r = analyze(make_metrics(), None, n_boot=50)
     assert r["bootstrap_ci"] == {}
     assert any("predictions" in n for n in r["notes"])
     assert S.render_stats_markdown(r)
@@ -242,7 +265,7 @@ def test_missing_predictions_and_variant_b_noted():
 
 def test_missing_columns_raises():
     with pytest.raises(ValueError):
-        S.run_preregistered_analysis(pd.DataFrame({"variant": ["A"]}), None)
+        analyze(pd.DataFrame({"variant": ["A"]}), None)
 
 
 def test_anomaly_flags_recall_zero_and_below_dummy():
@@ -251,21 +274,21 @@ def test_anomaly_flags_recall_zero_and_below_dummy():
     m.loc[mask, "value"] = 0.0
     mask2 = (m.model == "dtree") & (m.strategy == "none") & (m.metric == "macro_f1") & (m.split == "test")
     m.loc[mask2, "value"] = 0.05
-    r = S.run_preregistered_analysis(m, None, n_boot=0)
+    r = analyze(m, None, n_boot=0)
     types = {(a["type"], a["model"]) for a in r["anomalies"]}
     assert ("classe_com_recall_zero", "gnb") in types
     assert ("abaixo_do_dummy", "dtree") in types
 
 
 def test_h2_detects_strategy_gain_with_holm():
-    r = S.run_preregistered_analysis(make_metrics(), None, n_boot=0)
+    r = analyze(make_metrics(), None, n_boot=0)
     rows = [x for x in r["h2"]["rows"] if x["confirmatory"] and x["metric"] == "macro_f1"]
     assert rows and all(x["mean_diff"] > 0 and x["p_holm"] >= x["p"] - 1e-12 for x in rows)
     assert any(s["supported"] for s in r["h2"]["summary"])
 
 
 def test_ranking_reports_friedman_and_kendall():
-    r = S.run_preregistered_analysis(make_metrics(), None, n_boot=0)
+    r = analyze(make_metrics(), None, n_boot=0)
     rk = r["ranking"]["by_strategy"]["none"]
     assert 0 <= rk["kendall_w"] <= 1 and rk["nemenyi_cd"] > 0
     assert "Poder baixo" in r["ranking"]["warning"]
@@ -279,9 +302,8 @@ def test_mask_count():
 
 
 def test_render_markdown_masks_small_counts():
-    metrics = make_metrics(seeds=(1, 2, 3, 4, 5), variants=(VA, VB))
-    preds = make_predictions(seeds=(1, 2, 3, 4, 5), rare_class_1=6)
-    r = S.run_preregistered_analysis(metrics, preds, n_boot=50)
+    metrics, preds = coherent_analysis_inputs()
+    r = analyze(metrics, preds, n_boot=50)
     removal = r["sensitivity_b_vs_a"]["removal_by_class"]
     assert removal["1"]["n_test_a_mean_per_seed"] == "<11"  # raw 6 never stored
     assert removal["1"]["n_removed_mean_per_seed"] == "<11"  # raw 3 never stored

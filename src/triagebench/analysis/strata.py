@@ -20,7 +20,8 @@ from triagebench.reporting.tables import md_table
 METRICS = ("macro_f1", "balanced_accuracy", "qwk", "recall_1")
 
 
-def stratified_test_metrics(cdir: Path, prepared: Path, variants: list[str], strategy: str = "none") -> pd.DataFrame:
+def stratified_test_metrics(cdir: Path, prepared: Path, variants: list[str], strategy: str = "none",
+                            *, eligible_tasks: set[tuple] | None = None) -> pd.DataFrame:
     rows = []
     for variant in variants:
         path = Path(prepared) / "private" / f"{variant}.parquet"
@@ -30,13 +31,17 @@ def stratified_test_metrics(cdir: Path, prepared: Path, variants: list[str], str
         complete = data[list(VITALS)].notna().all(axis=1) & (data["pain_status"].astype(str) == "numeric")
         flag = pd.Series(complete.to_numpy(), index=data["stay_id"].to_numpy())
         for d in sorted(Path(cdir, "tasks").glob(f"{variant}__s*__*__{strategy}")):
+            _, seed, model, _ = d.name.split("__")
+            if eligible_tasks is not None and (variant, int(seed.lstrip("s")), model, strategy) not in eligible_tasks:
+                continue
             pred_path = d / "private" / "predictions.parquet"
             if not (d / "DONE").exists() or not pred_path.exists():
                 continue
-            _, seed, model, _ = d.name.split("__")
             p = pd.read_parquet(pred_path, columns=["stay_id", "partition", "y_true", "y_pred"])
             p = p[p["partition"] == "test"]
-            is_complete = flag.reindex(p["stay_id"].to_numpy()).fillna(False).to_numpy(dtype=bool)
+            if flag.index.duplicated().any() or not p["stay_id"].isin(flag.index).all():
+                raise ValueError("Prepared strata mapping does not uniquely cover the selected prediction stays")
+            is_complete = flag.reindex(p["stay_id"].to_numpy()).to_numpy(dtype=bool)
             for name, mask in (("complete", is_complete), ("incomplete", ~is_complete)):
                 sub = p[mask]
                 if sub.empty:
