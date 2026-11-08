@@ -214,3 +214,43 @@ checks and retained verbatim for template provenance.
 Starting code revision: `458a050667c7e9e6df6150c373e28c423db8411d`.
 Starting Git status: `?? reports/campaigns/`. This directory is outside the scope of
 inspection, staging, commits and publication by this session.
+
+## 2026-11-08: Q-FLEX closeout preparation, without real results
+
+Eduardo authorized Q-FLEX and aggregate-result analysis, excluding underlying
+data. The original service-eligibility condition still lacks documented evidence;
+confirmation was requested. No real result/report/derived artifact was accessed.
+Remote inspection covered hardware, Python availability and code commit IDs only.
+The production checkouts remain at `ae4b22d` and `8a831d0`; no campaign was started.
+
+Prepared `analyze --aggregates-only`, which bypasses private predictions and
+prepared inputs, labels missing prediction-dependent evidence, and writes separate
+statistics/reports. The original engine and registered cutoff are unchanged;
+principal designation remains disabled. Independent limited acceptance:
+`docs/reviews/2026-11-08-aggregate-scope-review.md`, with a generated 36-task
+diagnostic, five actual synthetic figures, and no forbidden access observed.
+
+Prepared `scripts/campaign_inventory.py` with default aggregate/metadata scope,
+exclusive destinations and external-digest verification. It captures structural
+integrity; it does not prove historical completeness, trustworthy time, scientific
+validity or service eligibility. The full closeout and executor handoff are in
+`docs/qflex_closeout.md`. Only the utility and its synthetic tests were copied to
+an isolated Q-FLEX validation directory; no production copy or real artifact was
+processed.
+
+The inventory utility received separate limited source/test review in
+`docs/reviews/2026-11-08-inventory-review.md`; no real capture or principal-analysis
+activation was certified.
+
+Validation: 17 focused analysis tests passed; full Windows synthetic suite:
+376 passed, 5 skipped, 1 expected synthetic-stratum warning, 114.50 seconds.
+The Windows skips cover four unavailable symlink cases and POSIX mode checks.
+All 51 inventory tests passed on Q-FLEX Linux, 0.95 seconds. Ruff on src/tests
+and the utility passed. The initial focused run encountered a pre-existing
+permission error in the system pytest temporary directory; reruns used fresh,
+ignored, workspace-local synthetic directories without changing system ACLs.
+
+No manuscript text, result placeholders, conceptual figures, bibliography or PDF
+was changed. Empirical review, accepted cutoff evidence and authorization to
+transfer the selected aggregate categories are still needed before numerical
+results can be inserted and the six-page PDF recompiled.

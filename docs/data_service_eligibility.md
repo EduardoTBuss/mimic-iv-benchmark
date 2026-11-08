@@ -2,6 +2,15 @@
 
 Checked: 2026-11-07. Status: **not established for this session**.
 
+Update 2026-11-08: Eduardo authorized Q-FLEX use and analysis of aggregate
+results, excluding underlying data. This establishes the requested artifact
+scope, but does not itself document the service-handling guarantees required
+by the original conditional restriction. Confirmation has been requested.
+The PhysioNet notice below was revisited on this date. Only hardware/runtime
+information and Git commit IDs were checked remotely; no campaign artifacts
+were opened. See `docs/qflex_closeout.md` for local execution and the explicit
+aggregates-only mode; that mode is not service-eligibility evidence.
+
 This check used public policy/documentation only. It did not open restricted
 data, campaign reports, private predictions or account credentials. It does not
 relax Eduardo's explicit prohibition on using those artifacts through this service.

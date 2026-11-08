@@ -68,23 +68,33 @@ def run_cost_stage(cfg: dict, cdir: Path, prepared: Path) -> None:
         log.warning("cost benchmark exited with code %s (report continues without it)", code)
 
 
-def analyze_and_report(cfg: dict, campaign: Path | None = None, *, analysis_time: str | None = None) -> Path:
+def analyze_and_report(cfg: dict, campaign: Path | None = None, *, analysis_time: str | None = None,
+                       aggregates_only: bool = False) -> Path:
     from triagebench.analysis.stats import REQUIRED_METRIC_COLS, run_preregistered_analysis
     from triagebench.reporting.summary import write_reports
 
     cdir = Path(campaign) if campaign else resolve_campaign_dir(cfg)
     meta = read_json(cdir / "campaign.json")
-    prep = Path(cfg["paths"]["outputs"]) / "prepared" / meta["prepared_id"]
+    prep = None if aggregates_only else Path(cfg["paths"]["outputs"]) / "prepared" / meta["prepared_id"]
     tables = aggregate_campaign(cdir)
     metrics = tables["metrics"]
-    preds = load_predictions(cdir, partitions=("test",)) if not metrics.empty else None
+    preds = load_predictions(cdir, partitions=("test",)) if not aggregates_only and not metrics.empty else None
     if metrics.empty:
         metrics = metrics.reindex(columns=REQUIRED_METRIC_COLS + ["finished_at"])
     stats = run_preregistered_analysis(metrics, preds, stats_config(cfg),
                                        n_boot=int((cfg.get("analysis") or {}).get("n_boot", 1000)),
                                        analysis_time=analysis_time)
-    atomic_write_json(cdir / "tables" / "stats.json", stats)
-    return write_reports(cfg, cdir, tables, stats, prep if prep.exists() else None)
+    stats["meta"]["input_scope"] = "aggregates_only" if aggregates_only else "with_private_predictions"
+    report_cfg = cfg
+    if aggregates_only:
+        stats["notes"].append("Aggregates-only mode: private predictions and prepared data were not read. "
+                              "Prediction integrity, patient bootstrap, common-stay A/B comparisons, strata "
+                              "and alternative decodings are unavailable; this is not a full empirical review.")
+        report_cfg = {**cfg, "paths": {**cfg["paths"], "reports": str(Path(cfg["paths"]["reports"]) / "aggregates-only")}}
+    stats_name = "stats_aggregates_only.json" if aggregates_only else "stats.json"
+    atomic_write_json(cdir / "tables" / stats_name, stats)
+    return write_reports(report_cfg, cdir, tables, stats, prep if prep is not None and prep.exists() else None,
+                         allow_private_inputs=not aggregates_only)
 
 
 def run_all(cfg: dict, force: bool = False, filters: dict | None = None, max_workers: int | None = None) -> dict:

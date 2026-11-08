@@ -176,6 +176,63 @@ def project_config(tmp_path):
             "evaluation": {"disclosure_min_cell": 11}, "campaign": {"tag": "synthetic"}}
 
 
+def test_aggregates_only_never_loads_private_inputs_and_preserves_full_report(tmp_path, monkeypatch):
+    from triagebench.cli import build_parser
+    from triagebench.runner import pipeline
+
+    assert build_parser().parse_args(["analyze", "--aggregates-only"]).aggregates_only
+    assert not build_parser().parse_args(["analyze"]).aggregates_only
+    metrics, _ = synthetic_tables()
+    cfg = project_config(tmp_path)
+    cfg["paths"]["outputs"] = str(tmp_path / "synthetic-output")
+    cdir = tmp_path / "synthetic-campaign"
+    (cdir / "tables").mkdir(parents=True)
+    metadata = {"campaign_id": "synthetic", "prepared_id": "synthetic", "dataset": {
+        "name": "synthetic", "version": "0", "zip_sha256": "0" * 64}}
+    (cdir / "campaign.json").write_text(json.dumps(metadata), encoding="utf-8")
+    (cdir / "manifest.json").write_text('{"sessions": []}', encoding="utf-8")
+    full_stats = cdir / "tables" / "stats.json"
+    full_stats.write_text("existing full analysis", encoding="utf-8")
+    full_report = tmp_path / "synthetic-report" / "campaigns" / "synthetic" / "summary.md"
+    full_report.parent.mkdir(parents=True)
+    full_report.write_text("existing full report", encoding="utf-8")
+
+    timings = metrics[S.TASK_COLS + ["finished_at"]].drop_duplicates().assign(
+        final_fit_seconds=1., predict_test_seconds=.1, n_test=20, task_seconds=1.,
+        n_warnings_final=0, hpo_n_error=0)
+    tables = {"metrics": metrics, "timings": timings,
+              "confusion": pd.DataFrame(columns=S.TASK_COLS + ["split", "true", "pred", "count"]),
+              **{key: pd.DataFrame() for key in
+                 ("per_class", "abs_error", "hpo_trials", "failures", "not_applicable")}}
+    monkeypatch.setattr(pipeline, "aggregate_campaign", lambda path: tables)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("aggregates-only mode attempted a private-input operation")
+
+    monkeypatch.setattr(pipeline, "load_predictions", forbidden)
+    monkeypatch.setattr(summary, "_strata_section", forbidden)
+    monkeypatch.setattr(summary, "_decodings_section", forbidden)
+    monkeypatch.setattr(summary.shutil, "copyfile", forbidden)
+    for name in ("fig_metric_box", "fig_strategy_effect", "fig_error_distance", "fig_confusion"):
+        monkeypatch.setattr(summary.figures, name, lambda *args, **kwargs: None)
+
+    report = pipeline.analyze_and_report(cfg, cdir, analysis_time=AS_OF, aggregates_only=True)
+    result = json.loads((cdir / "tables" / "stats_aggregates_only.json").read_text(encoding="utf-8"))
+    expected = S.run_preregistered_analysis(metrics, None, pipeline.stats_config(cfg), analysis_time=AS_OF)
+    for key in ("seeds_used", "h1", "h2", "h3", "ablation_a_minus_c"):
+        assert result[key] == expected[key]
+    assert result["meta"]["input_scope"] == "aggregates_only"
+    assert not result["meta"]["predictions_available"]
+    assert not result["prediction_integrity"]["checked"]
+    assert result["bootstrap_ci"] == {} and not result["sensitivity_b_vs_a"]["available"]
+    assert report == tmp_path / "synthetic-report" / "aggregates-only" / "campaigns" / "synthetic" / "summary.md"
+    text = report.read_text(encoding="utf-8")
+    assert "Input scope: aggregates only" in text and "This report does not replace" in text
+    assert full_stats.read_text(encoding="utf-8") == "existing full analysis"
+    assert full_report.read_text(encoding="utf-8") == "existing full report"
+    assert cfg["paths"]["reports"] == str(tmp_path / "synthetic-report")
+
+
 def test_secondary_h1_uses_prefix_and_requires_all_candidates(tmp_path):
     metrics, _ = synthetic_tables()
     cfg = project_config(tmp_path)

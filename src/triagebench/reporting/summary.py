@@ -263,7 +263,8 @@ def _anomalies_md(tables: dict, stats: dict | None, variant: str) -> str:
     return "\n".join(items)
 
 
-def write_reports(cfg: dict, cdir: Path, tables: dict, stats: dict | None, prepared_dir: Path | None) -> Path:
+def write_reports(cfg: dict, cdir: Path, tables: dict, stats: dict | None, prepared_dir: Path | None, *,
+                  allow_private_inputs: bool = True) -> Path:
     cdir = Path(cdir)
     meta = read_json(cdir / "campaign.json")
     manifest = read_json(cdir / "manifest.json")
@@ -279,7 +280,7 @@ def write_reports(cfg: dict, cdir: Path, tables: dict, stats: dict | None, prepa
     seeds = (stats or {}).get("seeds_used", [])
     status = (stats or {}).get("meta", {}).get("analysis_status", "unverified")
 
-    if prepared_dir and (Path(prepared_dir) / "data_preparation.md").exists():
+    if allow_private_inputs and prepared_dir and (Path(prepared_dir) / "data_preparation.md").exists():
         out.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(Path(prepared_dir) / "data_preparation.md", out / "data_preparation.md")
     if stats is not None:
@@ -310,6 +311,11 @@ def write_reports(cfg: dict, cdir: Path, tables: dict, stats: dict | None, prepa
         f"**Analysis status: {status}.** Selected seeds: {', '.join(map(str, seeds)) or 'none'}. "
         "Principal analysis is unavailable until immutable cutoff completeness provenance is verified.",
         "",
+        ("**Input scope: aggregates only.** Private predictions and prepared data were not read. "
+         "Patient bootstrap, prediction integrity, common-stay A/B comparisons, strata and alternative "
+         "decodings are unavailable. This report does not replace the full empirical review."
+         if not allow_private_inputs else ""),
+        "",
         f"# Resumo da campanha `{meta['campaign_id']}`",
         "",
         f"> Gerado automaticamente em {utc_now()} por `triagebench analyze`. Só agregados; contagens de 1 a {k - 1} "
@@ -339,7 +345,8 @@ def write_reports(cfg: dict, cdir: Path, tables: dict, stats: dict | None, prepa
         "",
         "## Estratos do teste: sinais completos × incompletos (pré-registrado em 05/11)",
         "",
-        _strata_section(cfg, cdir, prepared_dir, order, k, stats),
+        (_strata_section(cfg, cdir, prepared_dir, order, k, stats) if allow_private_inputs else
+         "_Strata omitted: aggregates-only mode does not read prepared data or private predictions._"),
         "",
         "## Variantes de sensibilidade (cada uma no seu próprio teste; B não é comparável diretamente com A)",
         "",
@@ -360,7 +367,8 @@ def write_reports(cfg: dict, cdir: Path, tables: dict, stats: dict | None, prepa
               "### H1 com a estratégia escolhida na validação", "",
               _h1_secondary_section(cfg, metrics, variant, seeds), "",
               "### Decodificações alternativas a partir das probabilidades salvas (teste, média entre seeds)", "",
-              _decodings_section(cdir, variant, order, stats), "",
+              (_decodings_section(cdir, variant, order, stats) if allow_private_inputs else
+               "_Alternative decodings omitted: aggregates-only mode does not read private probabilities._"), "",
               "## Custo computacional", "", _cost_table(cdir, cfg, stats), "",
               "## Busca de hiperparâmetros", "", _hpo_table(tables["hpo_trials"], order), "",
               "## Alertas e anomalias", "", _anomalies_md(execution_tables, stats, variant), "",

@@ -64,6 +64,10 @@ relatório agregado para `reports/campaigns/<id>/` (pode ir ao git).
 
 ## Campanha `main-38c9f7c0a8` (lançada em 05/11 00:38) — fechamento
 
+> Preparação em 08/11/2026: ver [fechamento Q-FLEX](qflex_closeout.md) para
+> inventário sem entradas privadas por padrão e `analyze --aggregates-only`.
+> Esse modo não habilita análise principal nem confirma elegibilidade do serviço.
+
 > Atualização de código de 06/11/2026: o pós-processamento distingue
 > `technical_preview` antes de **10/11/2026 12h BRT** de
 > `pending_cutoff_provenance` a partir do corte. Neste segundo estado,

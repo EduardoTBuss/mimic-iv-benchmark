@@ -96,7 +96,8 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     from triagebench.runner.pipeline import analyze_and_report
 
     cfg = _cfg(args)
-    out = analyze_and_report(cfg, campaign=Path(args.campaign) if args.campaign else None)
+    out = analyze_and_report(cfg, campaign=Path(args.campaign) if args.campaign else None,
+                             aggregates_only=args.aggregates_only)
     print(f"report -> {out}")
     return 0
 
@@ -201,6 +202,8 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("analyze", help="aggregate results, statistics, figures and reports/summary.md")
     _common(p)
     p.add_argument("--campaign", help="campaign directory (default: derived from the config)")
+    p.add_argument("--aggregates-only", action="store_true",
+                   help="do not read private predictions or prepared data; write a separate, incomplete report")
     p.set_defaults(func=cmd_analyze)
 
     p = sub.add_parser("importance", help="grouped permutation importance of the best simple/complex models (F5)")
